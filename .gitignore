@@ -1,0 +1,26 @@
+# build outputs
+build/
+build-*/
+cmake-build-*/
+*.o
+*.a
+*.exe
+*.out
+
+# python
+__pycache__/
+.pytest_cache/
+.venv/
+
+# service runtime
+ghreport-cache/
+
+# secrets and logs
+*.log
+.env
+*.token
+
+# editors / OS
+.idea/
+.vscode/
+.DS_Store
