@@ -135,7 +135,7 @@ def test_default_runner_none_on_missing_or_failing_command():
 
 # covers: default_runner
 def test_default_runner_none_on_timeout(monkeypatch):
-    def boom(*args, **kwargs):
+    def boom(*args, **kwargs) -> None:
         """Simulate a hanging command.
 
         Args:
