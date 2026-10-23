@@ -2,8 +2,7 @@
 
 Библиотека разметки сообщений (C++17, только стандартная библиотека). Спецификация: `docs/spec_part1.md`.
 
-Состояние: этапы 1.1-1.2 — инфраструктура, UTF-8, классы символов и ядро парсера. CLI и JSON пока не
-реализованы (`msgfmt` — заглушка).
+Состояние: этапы 1.1-1.3 — инфраструктура, UTF-8, классы символов, парсер, JSON, `escape` и CLI.
 
 ## Сборка и тесты
 
@@ -23,7 +22,21 @@ ctest --test-dir build
 - `include/msgfmt/charclass.hpp` — `is_whitespace`, `is_letter_or_digit` (табличные).
 - `include/msgfmt/parser.hpp` — `parse(u32string_view)`, `parse_utf8(string_view)`, `Style`, `Range`, `ParseResult`.
 - `include/msgfmt/parser_internal.hpp` — `msgfmt::detail`: `find_closer`, `try_open_marker`, `parse_link`, `parse_slice`, `sort_ranges` (для прямого тестирования).
+- `include/msgfmt/escape.hpp` — `is_service_char`, `escape_text`, `escape_utf8`.
+- `include/msgfmt/json.hpp` — `json_escape`, `to_json`, `error_json` (компактный JSON, порядок полей фиксирован).
+- `include/msgfmt/cli.hpp` — `run(args, in, out, err)`, `read_all`, `usage_text`, `set_binary_stdio`; `src/main.cpp` — тонкая обёртка.
 - `tests/test_framework.hpp` — собственный мини-харнесс (`TEST`, `CHECK`, `CHECK_EQ`, `CHECK_THROWS`).
+
+## Использование
+
+```
+printf 'Привет, **мир**!' | build/msgfmt        # {"text":"Привет, мир!","ranges":[{"style":"bold","offset":8,"length":3,"url":""}]}
+printf '2 * 3' | build/msgfmt escape            # 2 \* 3
+printf 'ÿ' | build/msgfmt; echo "code=$?"    # {"error":"invalid_utf8"}  code=2
+```
+
+Коды возврата: 0 — успех; 2 — некорректный UTF-8; 64 — неверные аргументы (usage в stderr); 70 — внутренняя ошибка.
+Вывод без завершающего перевода строки.
 
 ## Парсер: ключевые решения
 
