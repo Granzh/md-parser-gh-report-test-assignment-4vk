@@ -4,6 +4,7 @@
 
 #include "msgfmt/charclass.hpp"
 #include "msgfmt/contract.hpp"
+#include "msgfmt/escape.hpp"
 #include "msgfmt/parser_internal.hpp"
 #include "msgfmt/utf8.hpp"
 
@@ -26,8 +27,7 @@ std::string_view style_name(Style style) {  // NOLINT(contract) documented in pa
 namespace detail {
 
 bool is_escapable(char32_t cp) noexcept {  // NOLINT(contract) documented in parser_internal.hpp
-    return cp == U'*' || cp == U'_' || cp == U'`' || cp == U'[' || cp == U']' || cp == U'(' || cp == U')' ||
-           cp == U'\\';
+    return is_service_char(cp);
 }
 
 void append_utf8_lossy(std::string& out, char32_t cp) {  // NOLINT(contract) documented in parser_internal.hpp
