@@ -50,6 +50,10 @@ endfunction()
 msgfmt_add_test(test_framework_selftest)
 msgfmt_add_test(test_utf8)
 msgfmt_add_test(test_charclass)
+msgfmt_add_test(test_parser_utils)
+msgfmt_add_test(test_parser_internal)
+msgfmt_add_test(test_parser)
+msgfmt_add_test(test_parser_props)
 
 # Contract/coverage linter over this directory.
 find_package(Python3 COMPONENTS Interpreter)
