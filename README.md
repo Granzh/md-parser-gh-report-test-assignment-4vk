@@ -18,7 +18,14 @@ Python-интеграционные тесты. Правила разработ�
 - Окружение: `python tools/check_env.py`
 - Контракты и покрытие: `python tools/check_contracts.py tools --tests tools/tests --check-covers`
 - Тесты инструментов: `python -m pytest tools/tests -q`
-- Часть 1 (msgfmt): _заглушка_
+- Часть 1 (msgfmt), подробности — [msgfmt/README.md](msgfmt/README.md):
+  ```
+  cmake -S msgfmt -B build -DCMAKE_BUILD_TYPE=Release
+  cmake --build build
+  ctest --test-dir build
+  printf 'Привет, **мир**!' | build/msgfmt
+  ```
+  С санитайзерами: добавить `-DMSGFMT_SANITIZE=ON -DMSGFMT_WERROR=ON` (нужен g++/clang с поддержкой ASan/UBSan).
 - Часть 2 (ghreport): _заглушка_
 - Часть 3 (api_tests): _заглушка_
 
