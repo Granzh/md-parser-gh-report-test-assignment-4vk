@@ -54,6 +54,17 @@ msgfmt_add_test(test_parser_utils)
 msgfmt_add_test(test_parser_internal)
 msgfmt_add_test(test_parser)
 msgfmt_add_test(test_parser_props)
+msgfmt_add_test(test_escape)
+msgfmt_add_test(test_json_validator)
+msgfmt_add_test(test_json)
+msgfmt_add_test(test_cli)
+
+# Process-level test: runs the built msgfmt binary.
+msgfmt_add_test(test_cli_process)
+add_dependencies(test_cli_process msgfmt)
+target_compile_definitions(test_cli_process PRIVATE
+  MSGFMT_BIN="$<TARGET_FILE:msgfmt>"
+  MSGFMT_TMP_DIR="${CMAKE_CURRENT_BINARY_DIR}")
 
 # Contract/coverage linter over this directory.
 find_package(Python3 COMPONENTS Interpreter)
