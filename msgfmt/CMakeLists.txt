@@ -57,6 +57,7 @@ msgfmt_add_test(test_parser_props)
 msgfmt_add_test(test_escape)
 msgfmt_add_test(test_json_validator)
 msgfmt_add_test(test_json)
+msgfmt_add_test(test_fuzz)
 msgfmt_add_test(test_cli)
 
 # Process-level test: runs the built msgfmt binary.
