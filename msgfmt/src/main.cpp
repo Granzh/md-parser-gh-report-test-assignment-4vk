@@ -1,13 +1,20 @@
 #include <iostream>
+#include <string>
+#include <vector>
+
+#include "msgfmt/cli.hpp"
 
 /**
- * @brief Placeholder entry point of the msgfmt command line (parser is not implemented yet).
- * @return 1 always; prints a notice to stderr.
- * @pre none.
- * @post nothing is read from stdin or written to stdout.
- * @throws does not throw (stream failures are ignored).
+ * @brief Process entry point: a thin wrapper over msgfmt::run on the standard streams.
+ * @param argc number of command-line arguments.
+ * @param argv arguments; argv[0] is the program name and is not passed on.
+ * @return the exit code of msgfmt::run.
+ * @pre argv has argc valid entries.
+ * @post stdin and stdout are in binary mode on Windows.
+ * @throws does not throw.
  */
-int main() {
-    std::cerr << "msgfmt: not implemented yet\n";
-    return 1;
+int main(int argc, char** argv) {
+    msgfmt::set_binary_stdio();
+    const std::vector<std::string> args(argv + 1, argv + argc);
+    return msgfmt::run(args, std::cin, std::cout, std::cerr);
 }
