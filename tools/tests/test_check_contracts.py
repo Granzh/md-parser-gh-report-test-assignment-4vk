@@ -307,6 +307,11 @@ def test_cpp_function_refs_skip_deleted():
     assert [(r.name, r.line) for r in refs] == [("f", 3)]
 
 
+# covers: cpp_function_refs
+def test_cpp_function_refs_skip_main():
+    assert cc.cpp_function_refs("int main() { return 0; }\nint f();\n")[0].name == "f"
+
+
 # covers: go_functions
 def test_go_functions_collect_comments_and_methods():
     found = cc.go_functions("// A does a.\n// Args: x\nfunc (r *T) A() {}\n\nfunc B() {}\nvar f = func() {}\n")

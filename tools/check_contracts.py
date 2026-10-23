@@ -620,7 +620,8 @@ def cpp_function_refs(text: str) -> list:
         text: C++ source code.
 
     Returns:
-        FuncRef list with unqualified names (constructors use the class name).
+        FuncRef list with unqualified names (constructors use the class name);
+        ``main`` is excluded (the command line is tested end to end).
 
     Raises:
         None.
@@ -628,7 +629,7 @@ def cpp_function_refs(text: str) -> list:
     return [
         FuncRef(func.name, text.count("\n", 0, func.name_offset) + 1)
         for func in parse_cpp_functions(text)
-        if not func.skipped
+        if not func.skipped and func.name != "main"
     ]
 
 
