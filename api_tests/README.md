@@ -88,3 +88,21 @@ pytest api_tests -m selfcheck -q
 python tools/check_contracts.py api_tests --tests api_tests --check-covers
 python tools/check_contracts.py api_tests/helpers --tests api_tests/selfcheck --check-covers   # строже: без самопокрытия
 ```
+
+## Модули тестов службы
+
+| Файл | Что проверяет (ТЗ) |
+|------|--------------------|
+| `test_00_server_contract.py` | Пробы сервера (`SERVER VIOLATION:`) |
+| `test_01_pagination_limit.py` | 5.3.1: страницы, `--limit`, дубли на стыке, непрозрачные адреса страниц |
+| `test_02_pr_filter.py` | 5.3.2: фильтр PR по ключу `pull_request` |
+| `test_03_since.py` | 5.3.3: `--since` |
+| `test_04_cache.py` | 5.3.4: ETag, 304, повреждённый кэш, токен не в кэше |
+| `test_05_rate_limit.py` | 5.3.5: 429/403, паузы (метка `slow`) |
+| `test_06_errors.py` | 5.3.6: 401, 404, `all_failed`, битые ответы, повторы, ошибки аргументов |
+| `test_07_report_schema.py` | 5.3.7: схема, порядок, сравнение с оракулом, `--out` |
+| `test_08_trace.py` | 5.3.8: журнал `--trace` |
+| `test_09_request_format.py` | Заголовки, последовательность, редиректы, токен не уходит на другой origin |
+
+Против локального stub: `python api_tests/selfcheck/stub_server.py --port 8765`, затем `pytest api_tests -q` с `GHREPORT_BIN` и `GITHUB_API_BASE_URL=http://127.0.0.1:8765`
+(полный прогон ≈ 30 с, из них 18 с — реальные паузы службы в трёх `slow`-тестах).
