@@ -6,6 +6,7 @@ cmake-build-*/
 *.a
 *.exe
 *.out
+__cmake_systeminformation
 
 # python
 __pycache__/
@@ -14,6 +15,7 @@ __pycache__/
 
 # service runtime
 ghreport-cache/
+.ghreport-cache/
 
 # secrets and logs
 *.log
