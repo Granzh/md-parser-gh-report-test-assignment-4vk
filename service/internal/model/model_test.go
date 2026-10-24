@@ -209,10 +209,10 @@ func TestRenderReportEndsWithSingleNewlineAndNoCR(t *testing.T) {
 // covers: FatalJSON
 func TestFatalJSON(t *testing.T) {
 	cases := map[string]string{
-		FatalUnauthorized: `{"error":"unauthorized"}` + "\n",
-		FatalAllFailed:    `{"error":"all_failed"}` + "\n",
-		"":                `{"error":""}` + "\n",
-		`<&">`:            `{"error":"<&\">"}` + "\n",
+		FatalUnauthorized: `{"error": "unauthorized"}` + "\n",
+		FatalAllFailed:    `{"error": "all_failed"}` + "\n",
+		"":                `{"error": ""}` + "\n",
+		`<&">`:            `{"error": "<&\">"}` + "\n",
 	}
 	for in, want := range cases {
 		if got := string(FatalJSON(in)); got != want {

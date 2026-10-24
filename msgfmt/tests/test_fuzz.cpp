@@ -218,7 +218,7 @@ std::string byte_property_violation(const std::string& bytes) {
             return "decode_utf8, parse_utf8 and escape_utf8 disagree about validity";
         }
         if (!decoded) {
-            return msgfmt::error_json("invalid_utf8") == "{\"error\":\"invalid_utf8\"}" ? std::string()
+            return msgfmt::error_json("invalid_utf8") == "{\"error\": \"invalid_utf8\"}" ? std::string()
                                                                                        : "error_json changed";
         }
         if (to_utf8(*decoded) != bytes) {

@@ -64,7 +64,7 @@ TEST(run_parse_mode_empty_input) {
 TEST(run_parse_mode_invalid_utf8_gives_error_and_code_2) {
     const Outcome o = invoke({}, "**a**\xFF");
     CHECK_EQ(o.code, 2);
-    CHECK_EQ(o.out, std::string("{\"error\":\"invalid_utf8\"}"));
+    CHECK_EQ(o.out, std::string("{\"error\": \"invalid_utf8\"}"));
     CHECK(jsonv::is_valid_json(o.out));
 }
 
@@ -104,7 +104,7 @@ TEST(run_escape_mode_preserves_other_bytes) {
 TEST(run_escape_mode_invalid_utf8_gives_error_and_code_2) {
     const Outcome o = invoke({"escape"}, "*\xFF");
     CHECK_EQ(o.code, 2);
-    CHECK_EQ(o.out, std::string("{\"error\":\"invalid_utf8\"}"));
+    CHECK_EQ(o.out, std::string("{\"error\": \"invalid_utf8\"}"));
 }
 
 // covers: run

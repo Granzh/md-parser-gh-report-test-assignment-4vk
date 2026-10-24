@@ -96,10 +96,10 @@ TEST(process_escape) {
 TEST(process_invalid_utf8_in_both_modes) {
     const ProcessResult parse = run_process("bad_parse", "", "\xFF");
     CHECK_EQ(parse.code, 2);
-    CHECK_EQ(parse.out, std::string("{\"error\":\"invalid_utf8\"}"));
+    CHECK_EQ(parse.out, std::string("{\"error\": \"invalid_utf8\"}"));
     const ProcessResult escape = run_process("bad_escape", "escape", "\xFF");
     CHECK_EQ(escape.code, 2);
-    CHECK_EQ(escape.out, std::string("{\"error\":\"invalid_utf8\"}"));
+    CHECK_EQ(escape.out, std::string("{\"error\": \"invalid_utf8\"}"));
 }
 
 // covers: run, main

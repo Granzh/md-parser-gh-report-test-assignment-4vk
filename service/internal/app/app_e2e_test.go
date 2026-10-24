@@ -208,7 +208,7 @@ func TestAllRepositoriesFailedIsFatal(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			fake := testutil.New(t)
 			r := execute(t, argv, opts{env: base(fake, "")})
-			if r.code != 3 || r.stdout != `{"error":"all_failed"}`+"\n" || r.stderr == "" {
+			if r.code != 3 || r.stdout != `{"error": "all_failed"}`+"\n" || r.stderr == "" {
 				t.Fatalf("code %d stdout %q stderr %q", r.code, r.stdout, r.stderr)
 			}
 		})
@@ -221,7 +221,7 @@ func TestAllFailedStillWritesReportFile(t *testing.T) {
 	dir := t.TempDir()
 	out := filepath.Join(dir, "out", "report.json")
 	r := execute(t, []string{"--repos", "a/a", "--out", out}, opts{env: base(fake, ""), dir: dir})
-	if r.code != 3 || r.stdout != `{"error":"all_failed"}`+"\n" {
+	if r.code != 3 || r.stdout != `{"error": "all_failed"}`+"\n" {
 		t.Fatalf("code %d stdout %q", r.code, r.stdout)
 	}
 	b, err := os.ReadFile(out)
@@ -239,7 +239,7 @@ func TestUnauthorizedStopsImmediately(t *testing.T) {
 	dir := t.TempDir()
 	out := filepath.Join(dir, "report.json")
 	r := execute(t, []string{"--repos", "a/a,b/b,c/c", "--out", out}, opts{env: base(fake, guardToken), dir: dir})
-	if r.code != 3 || r.stdout != `{"error":"unauthorized"}`+"\n" || r.stderr == "" {
+	if r.code != 3 || r.stdout != `{"error": "unauthorized"}`+"\n" || r.stderr == "" {
 		t.Fatalf("code %d stdout %q stderr %q", r.code, r.stdout, r.stderr)
 	}
 	for _, req := range fake.Requests() {
@@ -260,7 +260,7 @@ func TestUnauthorizedOnFirstRepositoryWithOutDash(t *testing.T) {
 	fake := testutil.New(t)
 	fake.SetReply("a/a", testutil.Reply{Status: 401})
 	r := execute(t, []string{"--repos", "a/a", "--out", "-"}, opts{env: base(fake, "")})
-	if r.code != 3 || r.stdout != `{"error":"unauthorized"}`+"\n" {
+	if r.code != 3 || r.stdout != `{"error": "unauthorized"}`+"\n" {
 		t.Fatalf("code %d stdout %q", r.code, r.stdout)
 	}
 }

@@ -151,8 +151,8 @@ TEST(to_json_is_valid_json_for_many_inputs) {
 
 // covers: error_json
 TEST(error_json_format) {
-    CHECK_EQ(msgfmt::error_json("invalid_utf8"), std::string("{\"error\":\"invalid_utf8\"}"));
-    CHECK_EQ(msgfmt::error_json(""), std::string("{\"error\":\"\"}"));
-    CHECK_EQ(msgfmt::error_json("a\"b"), std::string("{\"error\":\"a\\\"b\"}"));
+    CHECK_EQ(msgfmt::error_json("invalid_utf8"), std::string("{\"error\": \"invalid_utf8\"}"));
+    CHECK_EQ(msgfmt::error_json(""), std::string("{\"error\": \"\"}"));
+    CHECK_EQ(msgfmt::error_json("a\"b"), std::string("{\"error\": \"a\\\"b\"}"));
     CHECK(jsonv::is_valid_json(msgfmt::error_json("x\ny")));
 }

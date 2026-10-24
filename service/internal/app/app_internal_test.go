@@ -157,8 +157,8 @@ func TestFinish(t *testing.T) {
 		{"all ok to stdout", []model.RepoReport{ok}, "", 0, "", false, ""},
 		{"partial to stdout", []model.RepoReport{ok, bad}, "", 1, "", false, ""},
 		{"all ok to file", []model.RepoReport{ok}, "f", 0, "NONE", true, `"error": null`},
-		{"all failed to stdout", []model.RepoReport{bad}, "", 3, `{"error":"all_failed"}` + "\n", false, ""},
-		{"all failed to file", []model.RepoReport{bad}, "f", 3, `{"error":"all_failed"}` + "\n", true, `"error": "not_found"`},
+		{"all failed to stdout", []model.RepoReport{bad}, "", 3, `{"error": "all_failed"}` + "\n", false, ""},
+		{"all failed to file", []model.RepoReport{bad}, "f", 3, `{"error": "all_failed"}` + "\n", true, `"error": "not_found"`},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
