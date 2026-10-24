@@ -96,7 +96,55 @@ setup); сбор тестов и мета-тесты работают и без 
 Итоговая таблица последнего прогона:
 
 ```
-@@TABLE@@
+mutant                          kind        status  sec   first failing test / note
+server:drop_item_between_pages  server      KILLED  1.0   test_00_server_contract.py::test_no_item_is_lost_between_pages
+server:pr_without_flag          server      KILLED  0.5   test_00_server_contract.py::test_pull_requests_carry_the_pull_request_key
+server:always_304               server      KILLED  0.5   test_00_server_contract.py::test_unconditional_requests_never_get_304
+server:broken_json              server      KILLED  0.4   test_00_server_contract.py::test_pull_requests_carry_the_pull_request_key
+server:reversed_sort            server      KILLED  0.5   test_00_server_contract.py::test_created_at_is_ascending_across_pages
+server:no_link                  server      KILLED  0.5   test_00_server_contract.py::test_link_next_is_present_whenever_a_next_page_exists
+compatible:dup_items            compatible  GREEN   32.1  -
+skip_last_item_of_page          service     KILLED  1.5   test_01_pagination_limit.py::test_limit_smaller_than_the_listing_spans_pages
+limit_plus_one                  service     KILLED  1.6   test_01_pagination_limit.py::test_limit_smaller_than_the_listing_spans_pages
+pr_not_filtered                 service     KILLED  1.5   test_01_pagination_limit.py::test_limit_smaller_than_the_listing_spans_pages
+pr_null_counts_as_issue         service     KILLED  2.7   test_02_pr_filter.py::test_pull_request_with_null_value_is_still_a_pull_request
+since_boundary_excluded         service     KILLED  2.9   test_03_since.py::test_since_inside_the_range_matches_the_oracle
+since_inverted                  service     KILLED  2.9   test_03_since.py::test_since_inside_the_range_matches_the_oracle
+since_sent_to_api               service     KILLED  3.5   test_03_since.py::test_the_since_parameter_is_not_sent_to_the_api
+sort_reversed                   service     KILLED  1.5   test_01_pagination_limit.py::test_limit_smaller_than_the_listing_spans_pages
+sort_by_number_only             service     KILLED  29.1  test_07_report_schema.py::test_sorting_uses_created_at_before_number
+sort_without_tiebreak           service     KILLED  28.5  test_07_report_schema.py::test_equal_created_at_is_ordered_by_number
+dedup_disabled                  service     KILLED  2.0   test_01_pagination_limit.py::test_duplicate_at_the_page_boundary_is_counted_once
+pages_built_by_hand             service     KILLED  2.3   test_01_pagination_limit.py::test_service_requests_exactly_the_page_addresses_it_was_given
+link_next_ignored               service     KILLED  1.5   test_01_pagination_limit.py::test_limit_smaller_than_the_listing_spans_pages
+if_none_match_never_sent        service     KILLED  4.2   test_04_cache.py::test_second_run_revalidates_every_request_with_the_stored_etag
+from_cache_always_false         service     KILLED  4.4   test_04_cache.py::test_second_run_revalidates_every_request_with_the_stored_etag
+cache_never_written             service     KILLED  4.5   test_04_cache.py::test_second_run_revalidates_every_request_with_the_stored_etag
+cache_not_refreshed             service     KILLED  6.9   test_04_cache.py::test_a_fresh_200_replaces_the_stored_etag
+cache_drops_link                service     KILLED  4.2   test_04_cache.py::test_second_run_revalidates_every_request_with_the_stored_etag
+retry_after_no_pause            service     KILLED  7.3   test_05_rate_limit.py::test_429_with_retry_after_is_waited_out
+rate_limit_403_not_recognised   service     KILLED  8.2   test_05_rate_limit.py::test_403_limit_signals_are_waited_out
+plain_403_is_rate_limit         service     KILLED  41.6  test_05_rate_limit.py::test_plain_403_is_not_a_rate_limit
+unauthorized_is_request_failed  service     KILLED  11.5  test_06_errors.py::test_401_is_fatal_with_exit_code_3
+not_found_is_request_failed     service     KILLED  12.5  test_06_errors.py::test_missing_repository_among_existing_ones
+all_failed_not_fatal            service     KILLED  12.4  test_06_errors.py::test_all_repositories_missing_is_fatal
+labels_null                     service     KILLED  1.5   test_01_pagination_limit.py::test_limit_smaller_than_the_listing_spans_pages
+author_dropped                  service     KILLED  1.5   test_01_pagination_limit.py::test_limit_smaller_than_the_listing_spans_pages
+authorization_in_trace          service     KILLED  29.2  test_08_trace.py::test_no_credentials_in_the_trace
+token_printed_to_stderr         service     KILLED  11.7  test_06_errors.py::test_401_is_fatal_with_exit_code_3
+token_sent_cross_origin         service     KILLED  31.5  test_09_request_format.py::test_authorization_is_not_sent_to_another_origin_after_a_redirect
+trace_attempt_zero              service     KILLED  8.1   test_05_rate_limit.py::test_429_with_retry_after_is_waited_out
+out_stdout_also_file            service     KILLED  29.3  test_07_report_schema.py::test_report_to_stdout_creates_no_files_in_the_working_directory
+repos_duplicates_kept           service     KILLED  27.2  test_07_report_schema.py::test_repository_order_follows_the_argument_and_duplicates_are_dropped
+user_agent_missing              service     KILLED  29.3  test_09_request_format.py::test_required_request_headers
+api_version_wrong               service     KILLED  29.3  test_09_request_format.py::test_required_request_headers
+retries_reduced                 service     KILLED  14.4  test_06_errors.py::test_persistent_failures_become_request_failed_after_three_retries
+redirect_307_not_followed       service     KILLED  31.3  test_09_request_format.py::test_redirects_are_followed_by_location[307]
+invalid_json_accepted           service     KILLED  12.8  test_06_errors.py::test_invalid_response_bodies[broken_json]
+
+total 44 - green: 1, killed: 43
+
+baseline: немутированная служба + stub — зелёный (32 с); код возврата скрипта 0; полный прогон ≈ 15 мин.
 ```
 
 ## Ограничения
