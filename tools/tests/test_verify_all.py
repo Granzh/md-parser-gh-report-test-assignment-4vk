@@ -363,8 +363,19 @@ def test_step_hygiene(tmp_path):
     outcome = va.step_hygiene(make_ctx(tmp_path, runner))
     assert outcome == StepOutcome(OK, "0 problem(s), 2 note(s)")
     assert "--repo" in runner.lines()[0]
+    assert any("check_repo_hygiene.py" in line and "--history" in line for line in runner.lines())
     failed = va.step_hygiene(make_ctx(tmp_path, FakeRunner(default=CmdResult(1, "secret: x", ""))))
     assert failed.status == FAIL and "secret: x" in failed.detail
+
+
+# covers: step_workflows
+def test_step_workflows(tmp_path):
+    runner = FakeRunner({"check_workflows": CmdResult(0, "3 file(s), 0 error(s), 0 warning(s)\n", "")})
+    outcome = va.step_workflows(make_ctx(tmp_path, runner))
+    assert outcome == StepOutcome(OK, "3 file(s), 0 error(s), 0 warning(s)")
+    assert ".github/workflows" in runner.lines()[0]
+    failed = va.step_workflows(make_ctx(tmp_path, FakeRunner(default=CmdResult(1, "ci.yml:1: error: x", ""))))
+    assert failed.status == FAIL and "ci.yml:1: error: x" in failed.detail
 
 
 # covers: step_selfchecks
@@ -464,8 +475,8 @@ def test_step_mutants(tmp_path):
 # covers: all_steps
 def test_all_steps_order_and_mutants_flag():
     names = [name for name, _ in va.all_steps(False)]
-    assert names == ["env", "msgfmt-release", "msgfmt-sanitize", "service", "contracts", "hygiene", "selfchecks", "suite",
-                     "docker-image", "docker-run"]
+    assert names == ["env", "msgfmt-release", "msgfmt-sanitize", "service", "contracts", "workflows", "hygiene",
+                     "selfchecks", "suite", "docker-image", "docker-run"]
     assert [name for name, _ in va.all_steps(True)][-1] == "mutants"
 
 

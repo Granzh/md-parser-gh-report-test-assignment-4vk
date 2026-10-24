@@ -185,7 +185,7 @@ def test_check_history_objects_flags_binaries_paths_and_sizes(tmp_path):
     details = [f.detail for f in cr.check_history_objects(cr.run_git(make_repo(tmp_path, files)))]
     assert any("bin/tool" in d and "ELF" in d for d in details)
     assert any("forbidden path" in d and "build/out.txt" in d for d in details)
-    assert any("big.dat" in d and "1 MiB" in d for d in details)
+    assert any("big.dat" in d and "> 1048576" in d for d in details)
     assert not any("fine.txt" in d for d in details)
 
 
