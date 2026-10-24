@@ -52,7 +52,7 @@ $ printf '2 * 3 _x_ [a](b) \\' | build/msgfmt escape
 2 \* 3 \_x\_ \[a\]\(b\) \\
 
 $ printf '\xff' | build/msgfmt; echo " code=$?"
-{"error":"invalid_utf8"} code=2
+{"error": "invalid_utf8"} code=2
 ```
 
 Вывод не содержит завершающего перевода строки (здесь `echo` добавлен ради читаемости).
@@ -74,7 +74,7 @@ $ printf '\xff' | build/msgfmt; echo " code=$?"
 - строки экранируются: `"`, `\`, `\b \f \n \r \t`, остальные U+0000–U+001F как `\u00xx` (hex в нижнем регистре);
   всё остальное, включая не-ASCII, `/` и U+2028/2029, выводится как есть.
 
-Ошибка: `{"error":"invalid_utf8"}`.
+Ошибка: `{"error": "invalid_utf8"}`.
 
 ## Коды возврата
 

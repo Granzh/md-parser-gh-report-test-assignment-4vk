@@ -62,7 +62,7 @@ std::string to_json(const ParseResult& result) {  // NOLINT(contract) documented
 }
 
 std::string error_json(std::string_view code) {  // NOLINT(contract) documented in json.hpp
-    return "{\"error\":\"" + json_escape(code) + "\"}";
+    return "{\"error\": \"" + json_escape(code) + "\"}";
 }
 
 }  // namespace msgfmt

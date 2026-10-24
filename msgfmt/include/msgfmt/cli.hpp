@@ -44,7 +44,7 @@ void set_binary_stdio();
  * @brief Runs the command line: parse (no arguments) or `escape`.
  *
  * Reads all of `in` as bytes. Parse mode prints the JSON of the parse result, escape mode prints the escaped
- * text; neither adds a trailing newline. Invalid UTF-8 prints {"error":"invalid_utf8"} and returns 2. Wrong
+ * text; neither adds a trailing newline. Invalid UTF-8 prints {"error": "invalid_utf8"} and returns 2. Wrong
  * arguments print the usage to `err`, leave `out` empty, do not read `in` and return kExitUsage.
  *
  * @param args arguments without the program name: {} or {"escape"}.

@@ -4,6 +4,7 @@ package model
 import (
 	"bytes"
 	"encoding/json"
+	"strings"
 	"time"
 )
 
@@ -118,13 +119,13 @@ func RenderReport(r Report) ([]byte, error) {
 // FatalJSON renders the fatal error document.
 //
 // Args: code is one of the Fatal* constants.
-// Returns: {"error":"<code>"} followed by a newline.
+// Returns: {"error": "<code>"} (one space after the colon, exactly as in the spec 4.4.6 table) followed by a newline.
 // Errors: never fails.
 func FatalJSON(code string) []byte {
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
 	enc.SetEscapeHTML(false)
-	// A map of strings cannot fail to encode.
-	_ = enc.Encode(map[string]string{"error": code})
-	return buf.Bytes()
+	// A string cannot fail to encode.
+	_ = enc.Encode(code)
+	return []byte(`{"error": ` + strings.TrimSuffix(buf.String(), "\n") + "}\n")
 }

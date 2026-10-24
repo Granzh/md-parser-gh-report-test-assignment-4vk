@@ -201,7 +201,7 @@ std::string text_property_violation(const std::u32string& input) {
  *
  * Properties: parse_utf8 and decode_utf8 agree on validity; for valid input encode(decode(bytes)) == bytes and
  * the result satisfies the parser invariants and the JSON/escape properties; invalid input yields nullopt for
- * parse_utf8, escape_utf8 and a `{"error":"invalid_utf8"}` document.
+ * parse_utf8, escape_utf8 and a `{"error": "invalid_utf8"}` document.
  *
  * @param bytes arbitrary bytes.
  * @return empty string if all properties hold, otherwise a description of the first violated one.

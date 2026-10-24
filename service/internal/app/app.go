@@ -76,8 +76,8 @@ func (s *scrubWriter) Write(p []byte) (int, error) {
 // the dependencies (nil fields get production defaults); stdout receives only the report or a fatal JSON object;
 // stderr receives all diagnostics, scrubbed of the token.
 // Returns: 0 all repositories succeeded; 1 some failed (report written); 2 invalid arguments or environment, or the
-// trace file cannot be opened (nothing else is done); 3 fatal: HTTP 401 (stdout {"error":"unauthorized"}, no report),
-// every repository failed (stdout {"error":"all_failed"}), or the report could not be written (stdout empty);
+// trace file cannot be opened (nothing else is done); 3 fatal: HTTP 401 (stdout {"error": "unauthorized"}, no report),
+// every repository failed (stdout {"error": "all_failed"}), or the report could not be written (stdout empty);
 // ExitInterrupted when ctx was cancelled (stdout empty). -h/--help prints usage to stderr and returns 0.
 // Errors: never fails; every problem is mapped to a code and a stderr message.
 func Run(ctx context.Context, argv []string, deps Deps, stdout, stderr io.Writer) int {
@@ -189,7 +189,7 @@ func collect(ctx context.Context, f *issues.Fetcher, opts args.Options, errw io.
 // Args: opts are the options (Out is the destination); report is the complete report; stdout and errw as in Run.
 // Returns: exitcode.OK or exitcode.Partial after the report was written to opts.Out ("-" is stdout). When every
 // repository failed: the report is still written to a file destination, but nothing goes to stdout except
-// {"error":"all_failed"}; the code is exitcode.Fatal. ExitIO when the report cannot be rendered or written.
+// {"error": "all_failed"}; the code is exitcode.Fatal. ExitIO when the report cannot be rendered or written.
 // Errors: never fails; problems are mapped to codes and stderr messages.
 func finish(opts args.Options, report model.Report, stdout io.Writer, errw io.Writer) int {
 	code, fatal := exitcode.Summarize(report.Repos)

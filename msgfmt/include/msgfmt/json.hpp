@@ -37,7 +37,7 @@ std::string json_escape(std::string_view utf8);
 std::string to_json(const ParseResult& result);
 
 /**
- * @brief Builds the error document {"error":"<code>"} (compact, no trailing newline).
+ * @brief Builds the error document {"error": "<code>"} exactly as written in spec 3.6 (one space after the colon, no trailing newline).
  * @param code machine-readable error code, e.g. "invalid_utf8"; JSON-escaped in the output.
  * @return the JSON document.
  * @pre none.
