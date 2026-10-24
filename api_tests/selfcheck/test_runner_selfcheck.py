@@ -218,3 +218,29 @@ def test_trace_of_reports_bad_lines_and_missing_file(tmp_path):
 def test_fake_binary_main_modes(tmp_path):
     result = run_fake(tmp_path, env_extra={"FAKE_EXIT": "2"})
     assert result.returncode == 2 and os.path.exists(FAKE[1])
+
+
+# covers: run_raw, _execute
+def test_run_raw_passes_arguments_verbatim_without_adding_options():
+    import json
+    result = runner.run_raw(["--bogus", "x"], binary=FAKE, base_url="http://127.0.0.1:1", token=None)
+    assert json.loads(result.stdout)["argv"] == ["--bogus", "x"] and result.returncode == 0
+    assert runner.run_raw([], binary=FAKE, base_url="http://x").returncode == 0
+
+
+# covers: run_raw, _execute
+def test_run_raw_times_out_and_demands_a_base_url(monkeypatch):
+    with pytest.raises(RunnerTimeout):
+        runner.run_raw([], binary=FAKE, base_url="http://x", env_extra={"FAKE_MODE": "hang"}, timeout=1.0)
+    monkeypatch.delenv("GITHUB_API_BASE_URL", raising=False)
+    with pytest.raises(RunnerError):
+        runner.run_raw([], binary=FAKE)
+
+
+# covers: _binary_or_env
+def test_binary_or_env_prefers_the_argument(monkeypatch):
+    monkeypatch.setenv("GHREPORT_BIN", "/from/env")
+    assert runner._binary_or_env("/explicit") == "/explicit" and runner._binary_or_env(None) == "/from/env"
+    monkeypatch.delenv("GHREPORT_BIN")
+    with pytest.raises(RunnerError, match="GHREPORT_BIN"):
+        runner._binary_or_env(None)

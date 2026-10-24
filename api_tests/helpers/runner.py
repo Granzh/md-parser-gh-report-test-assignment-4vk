@@ -162,13 +162,71 @@ def run_ghreport(repos, cache_dir, *args, env_extra=None, base_url=None, token=K
         RunnerError: No binary or base URL is configured.
         RunnerTimeout: The process did not finish in time (it is killed first).
     """
+    command = build_command(_binary_or_env(binary), repos, cache_dir, args, trace)
+    return _execute(command, base_url, token, env_extra, timeout)
+
+
+def run_raw(argv, base_url=None, token=KEEP_TOKEN, env_extra=None, timeout=None, binary=None):
+    """Run the service with a verbatim argument list (for argument-validation tests).
+
+    Args:
+        argv: Arguments after the executable, passed unchanged (no --repos/--out are added).
+        base_url: GITHUB_API_BASE_URL for the run; None keeps the environment value.
+        token: KEEP_TOKEN (default) keeps GITHUB_TOKEN, None removes it, a str sets it.
+        env_extra: Extra environment variables (None value removes a variable).
+        timeout: Seconds before the process is killed; None means GHREPORT_TIMEOUT or 60.
+        binary: Executable (or command prefix) to run; None means GHREPORT_BIN.
+
+    Returns:
+        Result with exit code, stdout, stderr and elapsed seconds.
+
+    Raises:
+        RunnerError: No binary or base URL is configured.
+        RunnerTimeout: The process did not finish in time (it is killed first).
+    """
+    prefix = _binary_or_env(binary)
+    prefix = [str(prefix)] if isinstance(prefix, (str, os.PathLike)) else [str(part) for part in prefix]
+    return _execute(prefix + [str(item) for item in argv], base_url, token, env_extra, timeout)
+
+
+def _binary_or_env(binary):
+    """Resolve the executable to run.
+
+    Args:
+        binary: Explicit executable/command prefix, or None.
+
+    Returns:
+        ``binary`` or the value of GHREPORT_BIN.
+
+    Raises:
+        RunnerError: Neither is available.
+    """
     if binary is None:
         binary = os.environ.get("GHREPORT_BIN")
         if not binary:
             raise RunnerError("GHREPORT_BIN is not set")
+    return binary
+
+
+def _execute(command, base_url, token, env_extra, timeout):
+    """Run a prepared command line with a timeout and capture its output.
+
+    Args:
+        command: Complete argument vector.
+        base_url: GITHUB_API_BASE_URL for the run, or None.
+        token: KEEP_TOKEN, None or a token string.
+        env_extra: Extra environment variables.
+        timeout: Seconds before the kill, or None for the default.
+
+    Returns:
+        Result with exit code, decoded output and elapsed seconds.
+
+    Raises:
+        RunnerError: No base URL is configured.
+        RunnerTimeout: The process did not finish in time (it is killed first).
+    """
     limit = default_timeout() if timeout is None else timeout
     env = build_env(base_url, token, env_extra)
-    command = build_command(binary, repos, cache_dir, args, trace)
     started = time.monotonic()
     try:
         completed = subprocess.run(command, capture_output=True, env=env, timeout=limit,
