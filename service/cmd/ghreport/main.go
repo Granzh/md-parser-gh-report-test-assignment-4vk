@@ -2,11 +2,26 @@
 package main
 
 import (
-	"fmt"
+	"context"
+	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"ghreport/internal/app"
+	"ghreport/internal/clock"
 )
 
 func main() {
-	fmt.Fprintln(os.Stderr, "ghreport: not implemented yet")
-	os.Exit(1)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	deps := app.Deps{
+		Clock:  clock.Real{},
+		HTTP:   &http.Client{}, // no client-wide timeout: httpx applies the per-request one
+		Now:    time.Now,
+		Getenv: os.Getenv,
+	}
+	code := app.Run(ctx, os.Args[1:], deps, os.Stdout, os.Stderr)
+	stop()
+	os.Exit(code)
 }
