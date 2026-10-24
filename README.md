@@ -1,6 +1,6 @@
 # vk-test
 
-[![CI](https://github.com/<OWNER>/<REPO>/actions/workflows/ci.yml/badge.svg)](https://github.com/<OWNER>/<REPO>/actions/workflows/ci.yml)
+[![CI](https://github.com/Granzh/md-parser-gh-report-test-assignment-4vk/actions/workflows/ci.yml/badge.svg)](https://github.com/Granzh/md-parser-gh-report-test-assignment-4vk/actions/workflows/ci.yml)
 
 Учебное задание из трёх частей:
 
