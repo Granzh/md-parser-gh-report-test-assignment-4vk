@@ -19,7 +19,7 @@
 | `service/` | Часть 2: модуль Go (`cmd/ghreport`, `internal/...`), `Dockerfile`, `.dockerignore`, [README](service/README.md) |
 | `api_tests/` | Часть 3: тесты `test_00…test_09`, `helpers/`, `selfcheck/` (stub-сервер, мутанты, мета-тесты), [README](api_tests/README.md) |
 | `tools/` | `check_env.py`, `check_contracts.py` (контракты и `covers:`), `check_repo.py` (гигиена), `verify_all.py`, `ghreport-docker.sh`; тесты в `tools/tests/` |
-| `docs/` | Спецификация (`spec_*.md`), [decisions.md](docs/decisions.md), [COMPLIANCE.md](docs/COMPLIANCE.md), [WORKLOG.md](docs/WORKLOG.md), [submission_email.md](docs/submission_email.md) |
+| `docs/` | Спецификация (`spec_*.md`), [decisions.md](docs/decisions.md), [COMPLIANCE.md](docs/COMPLIANCE.md), [WORKLOG.md](docs/WORKLOG.md) |
 
 ## Быстрый старт
 
