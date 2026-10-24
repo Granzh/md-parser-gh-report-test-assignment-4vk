@@ -44,6 +44,7 @@ class RequestRecord:
             issued, False for a continuation that did not honour the opaque cursor.
         status: Status code sent back to the client (None until the response is produced).
         injected: True when a rule produced the response instead of the upstream.
+        response_headers: List of (name, value) pairs of the response sent to the client.
     """
 
     method: str
@@ -55,6 +56,7 @@ class RequestRecord:
     cursor_valid: bool = None
     status: int = None
     injected: bool = False
+    response_headers: list = field(default_factory=list)
 
     @property
     def path(self):
@@ -715,6 +717,7 @@ class _Handler(BaseHTTPRequestHandler):
                 self.abort()
             else:
                 record.status = outcome.status
+                record.response_headers = list(outcome.headers)
                 self.send_outcome(outcome)
         finally:
             owner.end(record)

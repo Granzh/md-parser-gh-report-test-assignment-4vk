@@ -5,6 +5,7 @@ not at the service under test.
 """
 
 import math
+import urllib.parse
 
 from helpers.oracle import ServerViolation, parse_link_header, parse_timestamp, decode_items
 
@@ -173,6 +174,55 @@ def probe_link_present(oracle, repo):
     if status2 == 200 and decode_items(body2, url):
         return [violation(f"page 1 of {repo} (per_page=2) has no Link rel=\"next\" although page 2 is not empty")]
     return []
+
+
+def probe_full_pages(pages, per_page=100):
+    """Check that every page followed by another one holds exactly ``per_page`` items.
+
+    Args:
+        pages: Page dicts from OracleClient.fetch_pages (walked with ``per_page``).
+        per_page: Page size requested for the walk.
+
+    Returns:
+        List with one message per short non-final page (empty when compliant).
+
+    Raises:
+        None.
+    """
+    found = []
+    for index, page in enumerate(pages[:-1]):
+        if len(page["items"]) != per_page:
+            found.append(violation(f"page {index + 1} has {len(page['items'])} items with per_page={per_page} "
+                                   f"although another page follows"))
+    return found
+
+
+def probe_empty_after_last(oracle, pages):
+    """Check that the page after a page without ``rel="next"`` is empty.
+
+    Args:
+        oracle: OracleClient.
+        pages: Page dicts from OracleClient.fetch_pages; only 200 pages lacking a next link are probed.
+
+    Returns:
+        List of messages (empty when compliant); the probe builds the ``page+1`` address itself.
+
+    Raises:
+        ServerViolation: The probed response is malformed.
+        OracleError: Network failure.
+    """
+    found = []
+    for page in pages:
+        if page["status"] != 200 or "next" in parse_link_header(page["headers"].get("link", "")):
+            continue
+        parts = urllib.parse.urlsplit(page["url"])
+        query = dict(urllib.parse.parse_qsl(parts.query, keep_blank_values=True))
+        query["page"] = int(query.get("page", 1)) + 1
+        probe_url = urllib.parse.urlunsplit(parts._replace(query=urllib.parse.urlencode(query)))
+        status, _headers, body = oracle.get(probe_url)
+        if status == 200 and decode_items(body, probe_url):
+            found.append(violation(f"no Link rel=\"next\" on {page['url']} although {probe_url} is not empty"))
+    return found
 
 
 def check_server_contract(oracle, repo):

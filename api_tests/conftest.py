@@ -83,6 +83,23 @@ def proxy(env):
 
 
 @pytest.fixture
+def other_proxy(env):
+    """Second fault proxy, standing for a different origin (cross-origin redirect checks).
+
+    Args:
+        env: Validated environment.
+
+    Returns:
+        Started helpers.proxy.FaultProxy listening on its own port.
+
+    Raises:
+        None.
+    """
+    with FaultProxy(env.base_url) as running:
+        yield running
+
+
+@pytest.fixture
 def ghreport(env):
     """Callable that runs the service against the server with the suite's environment.
 
