@@ -109,7 +109,7 @@ def test_default_runner_captures_output_and_status():
 # covers: default_runner
 def test_default_runner_reports_missing_program_and_timeout():
     assert va.default_runner(["definitely-not-a-program-xyz"]).returncode == 127
-    slow = va.default_runner([sys.executable, "-c", "import time; time.sleep(30)"], timeout=0.5)
+    slow = va.default_runner([sys.executable, "-c", "import threading; threading.Event().wait()"], timeout=0.5)
     assert slow.returncode == 124 and "timeout" in slow.stderr
 
 
@@ -357,6 +357,17 @@ def test_step_contracts_checks_four_trees(tmp_path):
     assert bad.status == FAIL
 
 
+# covers: step_hygiene
+def test_step_hygiene(tmp_path):
+    runner = FakeRunner({"check_repo": CmdResult(0, "0 problem(s), 2 note(s)
+", "")})
+    outcome = va.step_hygiene(make_ctx(tmp_path, runner))
+    assert outcome == StepOutcome(OK, "0 problem(s), 2 note(s)")
+    assert "--repo" in runner.lines()[0]
+    failed = va.step_hygiene(make_ctx(tmp_path, FakeRunner(default=CmdResult(1, "secret: x", ""))))
+    assert failed.status == FAIL and "secret: x" in failed.detail
+
+
 # covers: step_selfchecks
 def test_step_selfchecks_reports_counts(tmp_path):
     runner = FakeRunner({"tools/tests": CmdResult(0, "10 passed in 1s", ""),
@@ -454,7 +465,7 @@ def test_step_mutants(tmp_path):
 # covers: all_steps
 def test_all_steps_order_and_mutants_flag():
     names = [name for name, _ in va.all_steps(False)]
-    assert names == ["env", "msgfmt-release", "msgfmt-sanitize", "service", "contracts", "selfchecks", "suite",
+    assert names == ["env", "msgfmt-release", "msgfmt-sanitize", "service", "contracts", "hygiene", "selfchecks", "suite",
                      "docker-image", "docker-run"]
     assert [name for name, _ in va.all_steps(True)][-1] == "mutants"
 
