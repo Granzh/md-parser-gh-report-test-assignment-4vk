@@ -426,3 +426,13 @@ def test_add_query_param_variants():
 # covers: log_message
 def test_handler_log_message_is_silent():
     assert px._Handler.log_message(None, "%s", "x") is None
+
+
+# covers: put_header, _put_header_after
+def test_put_header_replaces_or_adds_a_response_header(chain):
+    proxy, _stub = chain
+    proxy.add_rule(None, px.put_header("ETag", '"v2"'))
+    assert http_request(proxy.url + SMALL)[1]["etag"] == '"v2"'
+    proxy.add_rule(None, px.put_header("X-New", "1"))
+    headers = http_request(proxy.url + SMALL)[1]
+    assert headers["x-new"] == "1" and headers["etag"] != '"v2"'

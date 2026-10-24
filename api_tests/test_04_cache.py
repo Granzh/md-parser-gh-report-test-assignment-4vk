@@ -155,3 +155,22 @@ def test_a_server_without_etag_needs_no_cache(ghreport, proxy, cache_dir, tmp_pa
     proxy.clear_requests()
     run_cached(ghreport, proxy, plain_repo.repo, cache_dir, tmp_path / "t2.jsonl")
     assert all(not r.headers.get("if-none-match") for r in issue_requests(proxy))
+
+
+def test_a_fresh_200_replaces_the_stored_etag(ghreport, proxy, cache_dir, tmp_path, plain_repo, need):
+    """Spec 4.4.4: "answer 200: the cache is updated" - the next run must send the NEW ETag.
+
+    Run 2 hides If-None-Match from the server and stamps the answers with ETag "v2"; run 3 must revalidate with it.
+    Catches: a cache that is written once and never refreshed (stale If-None-Match forever).
+    """
+    run_cached(ghreport, proxy, plain_repo.repo, cache_dir, tmp_path / "t1.jsonl")
+    need(cache_files(cache_dir), "the service stored nothing (the server sends no ETag?)")
+    proxy.add_rule(None, px.drop_header("if-none-match", where="request"), times=None)
+    proxy.add_rule(None, px.put_header("ETag", '"v2"'), times=None)
+    run_cached(ghreport, proxy, plain_repo.repo, cache_dir, tmp_path / "t2.jsonl")
+    proxy.clear_rules()
+    proxy.clear_requests()
+    run_cached(ghreport, proxy, plain_repo.repo, cache_dir, tmp_path / "t3.jsonl")
+    requests = issue_requests(proxy)
+    assert requests and all(r.headers.get("if-none-match") == '"v2"' for r in requests), \
+        [r.headers.get("if-none-match") for r in requests]

@@ -450,6 +450,25 @@ def _drop_response_header_after(name, ctx, response):
     return response
 
 
+def _put_header_after(name, value, ctx, response):
+    """``after`` hook of put_header().
+
+    Args:
+        name: Response header name.
+        value: New header value.
+        ctx: RequestContext.
+        response: ProxyResponse from the upstream.
+
+    Returns:
+        The response in which the header appears exactly once with the new value.
+
+    Raises:
+        None.
+    """
+    response.headers = set_header(response.headers, name, value)
+    return response
+
+
 def _rewrite_body_after(function, ctx, response):
     """``after`` hook of rewrite_body().
 
@@ -601,6 +620,22 @@ def drop_header(name, where="response"):
     if where == "request":
         return Action(before=partial(_drop_request_header_before, name))
     raise ValueError(f"where must be 'response' or 'request', got {where!r}")
+
+
+def put_header(name, value):
+    """Set (replace or add) a header of the upstream response.
+
+    Args:
+        name: Header name, case-insensitive.
+        value: New value.
+
+    Returns:
+        Action with an ``after`` hook.
+
+    Raises:
+        None.
+    """
+    return Action(after=partial(_put_header_after, name, value))
 
 
 def rewrite_body(function):

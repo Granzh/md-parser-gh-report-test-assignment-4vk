@@ -119,3 +119,18 @@ def test_since_and_limit_together(ghreport, proxy, cache_dir, profiles, since_re
     entry = run_since(ghreport, proxy, since_repo.repo, cache_dir, since, limit=limit)
     assert_repo_matches(entry, pages, limit=limit, since=since)
     assert entry["count"] == limit
+
+
+def test_since_keeps_an_issue_created_exactly_at_midnight(ghreport, proxy, cache_dir, profiles, since_repo, need):
+    """Spec 4.2: "created not earlier than 00:00:00 UTC" - an issue created at that very second is included.
+
+    Catches: `<=` instead of `<` in the cut-off comparison (the boundary issue would be lost).
+    """
+    pages = profiles.pages(since_repo.repo)
+    midnight = [item for item in eligible_items(pages)
+                if parse_timestamp(item["created_at"]).strftime("%H:%M:%S") == "00:00:00"]
+    need(midnight, "no suitable issue was created exactly at 00:00:00 UTC")
+    since = parse_timestamp(midnight[0]["created_at"]).strftime("%Y-%m-%d")
+    entry = run_since(ghreport, proxy, since_repo.repo, cache_dir, since)
+    assert_repo_matches(entry, pages, limit=BIG_LIMIT, since=since)
+    assert midnight[0]["number"] in {issue["number"] for issue in entry["issues"]}

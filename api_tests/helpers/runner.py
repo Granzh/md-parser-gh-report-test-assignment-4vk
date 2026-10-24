@@ -141,7 +141,7 @@ def build_command(binary, repos, cache_dir, args, trace=None):
 
 
 def run_ghreport(repos, cache_dir, *args, env_extra=None, base_url=None, token=KEEP_TOKEN,
-                 trace=None, timeout=None, binary=None):
+                 trace=None, timeout=None, binary=None, cwd=None):
     """Run the service once and capture everything it produced.
 
     Args:
@@ -154,6 +154,7 @@ def run_ghreport(repos, cache_dir, *args, env_extra=None, base_url=None, token=K
         trace: Optional path for --trace.
         timeout: Seconds before the process is killed; None means GHREPORT_TIMEOUT or 60.
         binary: Executable (or command prefix) to run; None means GHREPORT_BIN.
+        cwd: Working directory of the process; None inherits the caller's.
 
     Returns:
         Result with exit code, stdout, stderr (decoded as UTF-8) and elapsed seconds.
@@ -163,10 +164,10 @@ def run_ghreport(repos, cache_dir, *args, env_extra=None, base_url=None, token=K
         RunnerTimeout: The process did not finish in time (it is killed first).
     """
     command = build_command(_binary_or_env(binary), repos, cache_dir, args, trace)
-    return _execute(command, base_url, token, env_extra, timeout)
+    return _execute(command, base_url, token, env_extra, timeout, cwd)
 
 
-def run_raw(argv, base_url=None, token=KEEP_TOKEN, env_extra=None, timeout=None, binary=None):
+def run_raw(argv, base_url=None, token=KEEP_TOKEN, env_extra=None, timeout=None, binary=None, cwd=None):
     """Run the service with a verbatim argument list (for argument-validation tests).
 
     Args:
@@ -176,6 +177,7 @@ def run_raw(argv, base_url=None, token=KEEP_TOKEN, env_extra=None, timeout=None,
         env_extra: Extra environment variables (None value removes a variable).
         timeout: Seconds before the process is killed; None means GHREPORT_TIMEOUT or 60.
         binary: Executable (or command prefix) to run; None means GHREPORT_BIN.
+        cwd: Working directory of the process; None inherits the caller's.
 
     Returns:
         Result with exit code, stdout, stderr and elapsed seconds.
@@ -186,7 +188,7 @@ def run_raw(argv, base_url=None, token=KEEP_TOKEN, env_extra=None, timeout=None,
     """
     prefix = _binary_or_env(binary)
     prefix = [str(prefix)] if isinstance(prefix, (str, os.PathLike)) else [str(part) for part in prefix]
-    return _execute(prefix + [str(item) for item in argv], base_url, token, env_extra, timeout)
+    return _execute(prefix + [str(item) for item in argv], base_url, token, env_extra, timeout, cwd)
 
 
 def _binary_or_env(binary):
@@ -208,7 +210,7 @@ def _binary_or_env(binary):
     return binary
 
 
-def _execute(command, base_url, token, env_extra, timeout):
+def _execute(command, base_url, token, env_extra, timeout, cwd=None):
     """Run a prepared command line with a timeout and capture its output.
 
     Args:
@@ -217,6 +219,7 @@ def _execute(command, base_url, token, env_extra, timeout):
         token: KEEP_TOKEN, None or a token string.
         env_extra: Extra environment variables.
         timeout: Seconds before the kill, or None for the default.
+        cwd: Working directory of the process, or None.
 
     Returns:
         Result with exit code, decoded output and elapsed seconds.
@@ -230,7 +233,7 @@ def _execute(command, base_url, token, env_extra, timeout):
     started = time.monotonic()
     try:
         completed = subprocess.run(command, capture_output=True, env=env, timeout=limit,
-                                   stdin=subprocess.DEVNULL)
+                                   stdin=subprocess.DEVNULL, cwd=cwd)
     except subprocess.TimeoutExpired as error:
         raise RunnerTimeout(
             f"ghreport did not finish within {limit} s: {command}",

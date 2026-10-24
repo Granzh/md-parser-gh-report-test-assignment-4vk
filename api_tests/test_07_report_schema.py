@@ -3,6 +3,7 @@
 import json
 from datetime import datetime, timedelta, timezone
 
+from helpers import proxy as px
 from helpers.expect import (BIG_LIMIT, RFC3339_UTC, assert_repo_matches, repo_entry, strip_volatile)
 from helpers.oracle import all_items, parse_timestamp
 from helpers.runner import report_of
@@ -120,3 +121,91 @@ def test_out_file_equals_stdout_report(ghreport, proxy, cache_dir, tmp_path, pla
     from_file = json.loads(out.read_text(encoding="utf-8"))
     assert strip_volatile(from_file) == strip_volatile(stdout_report)
     assert RFC3339_UTC.match(from_file["generated_at"])
+
+
+def renumber(equal_dates):
+    """Build a body rewriter that reverses the number order relative to the creation order.
+
+    Args:
+        equal_dates: True to also give every issue the same created_at (a pure tie-break scenario).
+
+    Returns:
+        Function mapping body bytes to body bytes: number -> 1000000 - number, optionally created_at fixed.
+
+    Raises:
+        None.
+    """
+    def rewrite(body):
+        """Rewrite one page.
+
+        Args:
+            body: JSON array bytes.
+
+        Returns:
+            Modified JSON array bytes.
+
+        Raises:
+            ValueError: The body is not JSON.
+        """
+        items = json.loads(body)
+        for item in items:
+            item["number"] = 1000000 - item["number"]
+            if equal_dates:
+                item["created_at"] = "2026-03-01T00:00:00Z"
+        return json.dumps(items, ensure_ascii=False).encode("utf-8")
+
+    return rewrite
+
+
+def transformed(pages, function):
+    """Apply a body rewriter to oracle pages so the oracle sees what the service sees.
+
+    Args:
+        pages: Oracle pages.
+        function: Body rewriter from renumber().
+
+    Returns:
+        New list of page dicts with rewritten items.
+
+    Raises:
+        ValueError: A page cannot be serialised.
+    """
+    return [dict(page, items=json.loads(function(json.dumps(page["items"]).encode("utf-8")))) for page in pages]
+
+
+def test_sorting_uses_created_at_before_number(ghreport, proxy, cache_dir, profiles, plain_repo):
+    """Spec 4.5: order by created_at first. Numbers are reversed against the time order by the proxy.
+
+    Catches: sorting by number only (identical to time order on ordinary data, so it needs this scenario).
+    """
+    function = renumber(False)
+    proxy.add_rule(None, px.rewrite_body(function), times=None)
+    _, report = run_report(ghreport, proxy, plain_repo.repo, cache_dir, "--limit", str(BIG_LIMIT))
+    pages = transformed(profiles.pages(plain_repo.repo), function)
+    assert_repo_matches(repo_entry(report, plain_repo.repo), pages, limit=BIG_LIMIT)
+
+
+def test_equal_created_at_is_ordered_by_number(ghreport, proxy, cache_dir, profiles, plain_repo):
+    """Spec 4.5: ties on created_at are broken by ascending number, whatever the server order was.
+
+    Catches: a missing tie-break (the server's order would leak into the report).
+    """
+    function = renumber(True)
+    proxy.add_rule(None, px.rewrite_body(function), times=None)
+    _, report = run_report(ghreport, proxy, plain_repo.repo, cache_dir, "--limit", str(BIG_LIMIT))
+    numbers = [issue["number"] for issue in repo_entry(report, plain_repo.repo)["issues"]]
+    assert numbers == sorted(numbers) and len(numbers) >= 2
+    assert_repo_matches(repo_entry(report, plain_repo.repo), transformed(profiles.pages(plain_repo.repo), function),
+                        limit=BIG_LIMIT)
+
+
+def test_report_to_stdout_creates_no_files_in_the_working_directory(ghreport, proxy, tmp_path, plain_repo):
+    """Spec 4.2: `--out -` means standard output only.
+
+    Catches: also writing the report to a file named "-" (or any file) in the working directory.
+    """
+    work = tmp_path / "work"
+    work.mkdir()
+    result = ghreport(plain_repo.repo, tmp_path / "cache", base_url=proxy.url, token=None, cwd=work)
+    assert result.returncode == 0 and result.stdout.strip()
+    assert list(work.iterdir()) == []

@@ -244,3 +244,16 @@ def test_binary_or_env_prefers_the_argument(monkeypatch):
     monkeypatch.delenv("GHREPORT_BIN")
     with pytest.raises(RunnerError, match="GHREPORT_BIN"):
         runner._binary_or_env(None)
+
+
+# covers: run_ghreport, run_raw, _execute
+def test_cwd_is_applied_to_the_child_process(tmp_path):
+    import json
+    work = tmp_path / "work"
+    work.mkdir()
+    code = "import os,sys;sys.stdout.write(os.getcwd())"
+    result = runner._execute([FAKE[0], "-c", code], "http://x", None, None, 20, work)
+    assert os.path.realpath(result.stdout) == os.path.realpath(str(work))
+    seen = json.loads(run_fake(tmp_path, cwd=work).stdout)
+    assert seen["argv"][0] == "--repos"
+    assert runner.run_raw([], binary=FAKE, base_url="http://x", cwd=work).returncode == 0
