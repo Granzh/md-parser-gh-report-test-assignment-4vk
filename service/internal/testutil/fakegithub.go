@@ -46,12 +46,18 @@ type FakeGitHub struct {
 	LinkCycle bool
 	// WeakETag emits ETag values as W/"...".
 	WeakETag bool
+	// OnRequest, when set, is called for every request after it was counted as in flight and before the response
+	// is produced; tests use it to hold requests open.
+	OnRequest func()
 
 	srv      *httptest.Server
 	mu       sync.Mutex
 	repos    map[string][]Item
 	replies  map[string]Reply
+	queues   map[string][]Reply
 	requests []Request
+	inflight int
+	maxSeen  int
 }
 
 // NewIssue creates a plain open issue.
@@ -88,7 +94,7 @@ func NewPR(number int, createdAt string) Item {
 // Errors: never fails.
 func New(t *testing.T) *FakeGitHub {
 	t.Helper()
-	f := &FakeGitHub{repos: map[string][]Item{}, replies: map[string]Reply{}}
+	f := &FakeGitHub{repos: map[string][]Item{}, replies: map[string]Reply{}, queues: map[string][]Reply{}}
 	f.srv = httptest.NewServer(http.HandlerFunc(f.serve))
 	f.URL = f.srv.URL
 	t.Cleanup(f.srv.Close)
@@ -117,6 +123,18 @@ func (f *FakeGitHub) SetReply(repo string, r Reply) {
 	f.replies[repo] = r
 }
 
+// QueueReplies makes the next requests for a repository return the given canned responses, one per request, in
+// order; afterwards the repository behaves normally again (or as set by SetReply).
+//
+// Args: repo is "owner/name"; replies are appended to the queue; Status 0 means 200.
+// Returns: nothing.
+// Errors: never fails.
+func (f *FakeGitHub) QueueReplies(repo string, replies ...Reply) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.queues[repo] = append(f.queues[repo], replies...)
+}
+
 // Requests returns all requests received so far.
 //
 // Args: none.
@@ -139,6 +157,17 @@ func (f *FakeGitHub) Count() int {
 	return len(f.requests)
 }
 
+// MaxConcurrent returns the highest number of requests that were being served at the same time.
+//
+// Args: none.
+// Returns: 0 before the first request, 1 for strictly sequential clients.
+// Errors: never fails.
+func (f *FakeGitHub) MaxConcurrent() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.maxSeen
+}
+
 // Reset forgets the recorded requests.
 //
 // Args: none.
@@ -159,7 +188,18 @@ func (f *FakeGitHub) Reset() {
 func (f *FakeGitHub) serve(w http.ResponseWriter, r *http.Request) {
 	f.mu.Lock()
 	f.requests = append(f.requests, Request{URI: r.URL.RequestURI(), Header: r.Header.Clone()})
+	f.inflight++
+	f.maxSeen = max(f.maxSeen, f.inflight)
+	hook := f.OnRequest
 	f.mu.Unlock()
+	defer func() {
+		f.mu.Lock()
+		f.inflight--
+		f.mu.Unlock()
+	}()
+	if hook != nil {
+		hook()
+	}
 
 	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
 	if r.Method != http.MethodGet || len(parts) != 4 || parts[0] != "repos" || parts[3] != "issues" {
@@ -170,6 +210,10 @@ func (f *FakeGitHub) serve(w http.ResponseWriter, r *http.Request) {
 	f.mu.Lock()
 	items, known := f.repos[repo]
 	reply, replied := f.replies[repo]
+	if q := f.queues[repo]; len(q) > 0 {
+		reply, replied = q[0], true
+		f.queues[repo] = q[1:]
+	}
 	f.mu.Unlock()
 	if replied {
 		for k, v := range reply.Header {

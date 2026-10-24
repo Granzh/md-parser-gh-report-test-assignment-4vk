@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -258,5 +259,55 @@ func TestLinkHeader(t *testing.T) {
 	f.RelativeLinks = true
 	if got := f.linkHeader(nil, parts, 1, 10, 25); !strings.HasPrefix(got, "</repos/o/r/issues?") {
 		t.Fatalf("relative: %q", got)
+	}
+}
+
+// covers: FakeGitHub.MaxConcurrent
+func TestMaxConcurrent(t *testing.T) {
+	f := New(t)
+	if f.MaxConcurrent() != 0 {
+		t.Fatal("fresh fake")
+	}
+	get(t, f.URL+"/x")
+	get(t, f.URL+"/y")
+	if f.MaxConcurrent() != 1 {
+		t.Fatalf("sequential requests: %d", f.MaxConcurrent())
+	}
+	// two overlapping requests: the first one is held until the second one arrives
+	release := make(chan struct{})
+	var once sync.Once
+	first := make(chan struct{})
+	f.OnRequest = func() {
+		held := false
+		once.Do(func() { held = true; close(first) })
+		if held {
+			<-release
+			return
+		}
+		close(release)
+	}
+	done := make(chan struct{})
+	go func() { get(t, f.URL+"/a"); close(done) }()
+	<-first
+	get(t, f.URL+"/b")
+	<-done
+	if f.MaxConcurrent() != 2 {
+		t.Fatalf("overlapping requests: %d", f.MaxConcurrent())
+	}
+}
+
+// covers: FakeGitHub.QueueReplies
+func TestQueueReplies(t *testing.T) {
+	f := New(t)
+	f.SetRepo("o/r", five())
+	f.QueueReplies("o/r", Reply{Status: 503}, Reply{Status: 429, Header: map[string]string{"Retry-After": "3"}})
+	if resp, _ := get(t, f.URL+"/repos/o/r/issues"); resp.StatusCode != 503 {
+		t.Fatalf("first: %d", resp.StatusCode)
+	}
+	if resp, _ := get(t, f.URL+"/repos/o/r/issues"); resp.StatusCode != 429 || resp.Header.Get("Retry-After") != "3" {
+		t.Fatalf("second: %d", resp.StatusCode)
+	}
+	if resp, body := get(t, f.URL+"/repos/o/r/issues"); resp.StatusCode != 200 || !strings.HasPrefix(body, "[") {
+		t.Fatalf("after queue: %d %s", resp.StatusCode, body)
 	}
 }
