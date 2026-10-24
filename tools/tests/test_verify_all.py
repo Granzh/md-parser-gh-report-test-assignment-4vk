@@ -359,8 +359,7 @@ def test_step_contracts_checks_four_trees(tmp_path):
 
 # covers: step_hygiene
 def test_step_hygiene(tmp_path):
-    runner = FakeRunner({"check_repo": CmdResult(0, "0 problem(s), 2 note(s)
-", "")})
+    runner = FakeRunner({"check_repo": CmdResult(0, "0 problem(s), 2 note(s)\n", "")})
     outcome = va.step_hygiene(make_ctx(tmp_path, runner))
     assert outcome == StepOutcome(OK, "0 problem(s), 2 note(s)")
     assert "--repo" in runner.lines()[0]
