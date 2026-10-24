@@ -37,7 +37,13 @@ Python-интеграционные тесты. Правила разработ�
   Другой адрес API: `-e GITHUB_API_BASE_URL=<адрес>` (из контейнера до сервера на хосте —
   `--add-host=host.docker.internal:host-gateway` и `http://host.docker.internal:<порт>`).
   Проверка контрактов: `python tools/check_contracts.py service --tests service --check-covers`
-- Часть 3 (api_tests): _заглушка_
+- Часть 3 (api_tests), подробности — [api_tests/README.md](api_tests/README.md):
+  ```
+  pip install -r api_tests/requirements.txt
+  pytest api_tests -m selfcheck -q        # мета-тесты набора, сервер не нужен
+  GHREPORT_BIN=... GITHUB_API_BASE_URL=... pytest api_tests -q
+  python tools/check_contracts.py api_tests --tests api_tests --check-covers
+  ```
 
 ## Затраченное время
 
