@@ -1,0 +1,31 @@
+# Еженедельные обновления зависимостей. У service/ нет сторонних зависимостей (только stdlib), запись gomod нужна
+# для обновления директивы go и на случай, если зависимость когда-нибудь появится.
+# tools/ не имеет requirements-файла, поэтому для него записи pip нет.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      actions-minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: gomod
+    directory: /service
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    groups:
+      go-minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: pip
+    directory: /api_tests
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    groups:
+      pip-minor-and-patch:
+        update-types: [minor, patch]
