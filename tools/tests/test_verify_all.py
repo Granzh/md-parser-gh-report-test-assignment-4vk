@@ -270,6 +270,14 @@ def test_step_env(tmp_path):
     assert bad.status == FAIL and "check_env" in bad.detail
 
 
+# covers: generator_args
+def test_generator_args():
+    assert va.generator_args("linux", {}, lambda name: "/usr/bin/ninja") == []
+    assert va.generator_args("win32", {"CMAKE_GENERATOR": "Ninja"}, lambda name: None) == []
+    assert va.generator_args("win32", {}, lambda name: "C:/ninja.exe") == ["-G", "Ninja"]
+    assert va.generator_args("win32", {}, lambda name: None) == ["-G", "MinGW Makefiles"]
+
+
 # covers: build_msgfmt
 def test_build_msgfmt_ok_and_arguments(tmp_path):
     runner = FakeRunner({"ctest": CmdResult(0, "100% tests passed, 0 tests failed out of 15", "")})

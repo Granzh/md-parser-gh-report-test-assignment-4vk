@@ -427,6 +427,26 @@ def step_env(ctx: Context) -> StepOutcome:
     return bad or StepOutcome(OK, "toolchain present")
 
 
+def generator_args(platform: str, env: Mapping[str, str], which: Callable[[str], Optional[str]] = shutil.which) -> list:
+    """Pick a CMake generator for hosts where the default one is unusable.
+
+    Args:
+        platform: ``sys.platform`` value.
+        env: Child environment; a set ``CMAKE_GENERATOR`` always wins.
+        which: Program lookup (injectable), ``shutil.which`` by default.
+
+    Returns:
+        ``[]`` on non-Windows hosts or when CMAKE_GENERATOR is set; on Windows ``["-G", "Ninja"]`` if ninja is on
+        PATH, else ``["-G", "MinGW Makefiles"]`` (CMake would otherwise choose a Visual Studio generator).
+
+    Raises:
+        None.
+    """
+    if not platform.startswith("win") or env.get("CMAKE_GENERATOR"):
+        return []
+    return ["-G", "Ninja"] if which("ninja") else ["-G", "MinGW Makefiles"]
+
+
 def build_msgfmt(ctx: Context, name: str, extra: Sequence[str]) -> StepOutcome:
     """Configure, build and test msgfmt in a build tree outside the clone.
 
@@ -445,7 +465,8 @@ def build_msgfmt(ctx: Context, name: str, extra: Sequence[str]) -> StepOutcome:
     build = ctx.work / name
     commands = [
         ("cmake configure", ["cmake", "-S", str(ctx.repo / "msgfmt"), "-B", str(build), "-DCMAKE_BUILD_TYPE=Release",
-                             "-DMSGFMT_WERROR=ON", *extra], None),
+                             "-DMSGFMT_WERROR=ON", *generator_args(ctx.platform, ctx.env), *extra],
+         None),
         ("cmake build", ["cmake", "--build", str(build)], None),
         ("ctest", ["ctest", "--test-dir", str(build), "-V", "--output-on-failure"], None),
     ]
