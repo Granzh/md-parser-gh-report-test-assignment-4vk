@@ -11,3 +11,4 @@
 | 2026-10-24 | 2.2 ghreport: транспортный слой | linkhdr, trace, httpx (заголовки, ручные редиректы, повторы, лимиты), service/README.md, решения в decisions.md | | Claude Code |
 | 2026-10-24 | 2.3 ghreport: кэш и issue репозитория | cache (ETag+Link), testutil.FakeGitHub, issues.Fetcher (пагинация по Link, limit, since, дедупликация, фильтр PR, ErrorCode) | | Claude Code |
 | 2026-10-24 | 2.4 ghreport: сборка службы | internal/app (Run, Scrub), cmd/ghreport/main.go, сквозные тесты на FakeGitHub, ручной прогон бинарника против python http.server | | Claude Code |
+| 2026-10-24 | 2.5 ghreport: контейнеризация и документация | service/Dockerfile (distroless nonroot), .dockerignore, полный service/README.md, Быстрый старт части 2; docker не запускался (движок Docker Desktop выключен) — образ не проверен | | Claude Code |

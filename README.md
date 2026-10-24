@@ -26,7 +26,17 @@ Python-интеграционные тесты. Правила разработ�
   printf 'Привет, **мир**!' | build/msgfmt
   ```
   С санитайзерами: добавить `-DMSGFMT_SANITIZE=ON -DMSGFMT_WERROR=ON` (нужен g++/clang с поддержкой ASan/UBSan).
-- Часть 2 (ghreport): _заглушка_
+- Часть 2 (ghreport), подробности — [service/README.md](service/README.md):
+  ```
+  cd service && gofmt -l . && go vet ./... && go test ./... -race -count=1
+  go build -o ghreport ./cmd/ghreport
+  GITHUB_TOKEN=... ./ghreport --repos cli/cli --limit 20 --out -
+  docker build -t ghreport service/
+  docker run --rm -e GITHUB_TOKEN=... ghreport --repos cli/cli --limit 20 --out -
+  ```
+  Другой адрес API: `-e GITHUB_API_BASE_URL=<адрес>` (из контейнера до сервера на хосте —
+  `--add-host=host.docker.internal:host-gateway` и `http://host.docker.internal:<порт>`).
+  Проверка контрактов: `python tools/check_contracts.py service --tests service --check-covers`
 - Часть 3 (api_tests): _заглушка_
 
 ## Затраченное время
