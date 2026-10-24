@@ -633,6 +633,50 @@ def cpp_function_refs(text: str) -> list:
     ]
 
 
+def mask_go_raw_strings(text: str) -> str:
+    """Blank the contents of Go raw string literals (backquotes).
+
+    Args:
+        text: Go source code.
+
+    Returns:
+        String of the same length and with the same newlines where every
+        character inside a raw string literal is a space, so ``func`` lines
+        embedded in test data are not mistaken for declarations.  Backquotes
+        inside ``//`` comments, ``/* */`` comments, interpreted strings and
+        rune literals are left alone.
+
+    Raises:
+        None.
+    """
+    out = list(text)
+    n = len(text)
+    i = 0
+    while i < n:
+        if text.startswith("//", i):
+            end = text.find("\n", i)
+            i = n if end == -1 else end
+        elif text.startswith("/*", i):
+            end = text.find("*/", i + 2)
+            i = n if end == -1 else end + 2
+        elif text[i] in "\"'":
+            quote = text[i]
+            i += 1
+            while i < n and text[i] != quote and text[i] != "\n":
+                i += 2 if text[i] == "\\" else 1
+            i += 1
+        elif text[i] == "`":
+            end = text.find("`", i + 1)
+            end = n if end == -1 else end
+            for k in range(i + 1, end):
+                if text[k] != "\n":
+                    out[k] = " "
+            i = end + 1
+        else:
+            i += 1
+    return "".join(out)
+
+
 def go_functions(text: str) -> list:
     """Find top-level Go functions together with their preceding comment.
 
@@ -647,8 +691,9 @@ def go_functions(text: str) -> list:
         None.
     """
     lines = text.split("\n")
+    masked = mask_go_raw_strings(text).split("\n")
     found = []
-    for index, line in enumerate(lines):
+    for index, line in enumerate(masked):
         match = re.match(r"func\s+(?:\([^)]*\)\s*)?([A-Za-z_]\w*)\s*[\[(]", line)
         if match is None:
             continue

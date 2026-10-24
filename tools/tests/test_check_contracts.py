@@ -448,3 +448,29 @@ def test_match_brace_nested_and_unbalanced():
     code = "{ a { b } c } d"
     assert cc._match_brace(code, 0) == code.index("} d")
     assert cc._match_brace("{ never closed", 0) == len("{ never closed") - 1
+
+
+# covers: mask_go_raw_strings
+def test_mask_go_raw_strings_blanks_only_raw_contents():
+    text = 'x := `a\nfunc F() {}\n`\n// not `raw\ny := "`" + \'`\'\n'
+    masked = cc.mask_go_raw_strings(text)
+    assert len(masked) == len(text) and masked.count("\n") == text.count("\n")
+    assert "func F" not in masked
+    assert "// not `raw" in masked and '"`"' in masked and "'`'" in masked
+
+
+# covers: mask_go_raw_strings
+def test_mask_go_raw_strings_unterminated_and_block_comment():
+    assert cc.mask_go_raw_strings("/* ` */ a") == "/* ` */ a"
+    assert cc.mask_go_raw_strings("a `bc") == "a `  "
+
+
+# covers: go_functions
+def test_go_functions_ignores_raw_string_and_handles_generics_multiline():
+    src = (
+        "// Map applies f.\nfunc Map[T, U any](\n\txs []T,\n) []U { return nil }\n"
+        "func (s *Stack[T]) Push(\n\tv T) {}\n"
+        "var raw = `\nfunc Fake() {}\n`\n"
+    )
+    assert [f[0] for f in cc.go_functions(src)] == ["Map", "Push"]
+    assert cc.go_functions(src)[0][2] == ["Map applies f."]
