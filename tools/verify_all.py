@@ -752,7 +752,10 @@ def step_mutants(ctx: Context) -> StepOutcome:
     """
     results, bad = run_sequence(ctx, [("run_mutants", [ctx.python, "api_tests/selfcheck/run_mutants.py"], ctx.repo)],
                                 env=dict(ctx.env, PYTHONDONTWRITEBYTECODE="1"))
-    return bad or StepOutcome(OK, tail_lines(results[0].stdout, 1))
+    if bad:
+        return bad
+    totals = [line for line in results[0].stdout.splitlines() if line.startswith("total ")]
+    return StepOutcome(OK, totals[-1] if totals else tail_lines(results[0].stdout, 1))
 
 
 def all_steps(with_mutants: bool) -> list:
