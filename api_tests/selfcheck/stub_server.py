@@ -101,12 +101,12 @@ def build_repos():
 
     Returns:
         Dict repo -> list of items in ascending (created_at instant, number) order. ``stub/alpha``
-        has 250 items (every fifth is a pull request), ``stub/small`` 3 issues, ``stub/empty`` none.
+        has 250 items (every fifth is a pull request: numbers 2, 7, 12, ...; items 100, 200 and 250 closing the pages are issues), ``stub/small`` 3 issues, ``stub/empty`` none.
 
     Raises:
         None.
     """
-    alpha = [make_item("stub/alpha", n, n % 5 == 0, labelled=n % 4 != 0, unicode_title=n % 3 == 0)
+    alpha = [make_item("stub/alpha", n, n % 5 == 2, labelled=n % 4 != 0, unicode_title=n % 3 == 0)
              for n in range(1, 251)]
     small = [make_item("stub/small", n, False) for n in (1, 2, 3)]
     return {"stub/alpha": alpha, "stub/small": small, "stub/empty": []}

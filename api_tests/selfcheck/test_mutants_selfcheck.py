@@ -446,3 +446,23 @@ def test_main_validate_and_unknown_id_and_table_output(tmp_path, monkeypatch, ca
     monkeypatch.setattr(rm, "validate", lambda directory: (_ for _ in ()).throw(StaleMutant("zzz")))
     assert rm.main(["--validate"]) == 2
     assert "STALE MUTANT: zzz" in capsys.readouterr().err
+
+
+# covers: _flush_print
+def test_flush_print_writes_the_line(capsys):
+    rm._flush_print("progress")
+    assert capsys.readouterr().out == "progress\n"
+
+
+# covers: compile_all
+def test_compile_all_reports_stale_and_uncompilable_mutants(tmp_path, monkeypatch, capsys):
+    service = table_fixture(tmp_path, monkeypatch)
+    assert rm.compile_all(service) == []
+    assert rm.main(["--compile", "--service-dir", str(service)]) == 0
+    assert "service mutants compile" in capsys.readouterr().out
+    stale = ServiceMutant("old", "d", (Edit("a.go", "not-there", "x"),))
+    monkeypatch.setattr(rm, "SERVICE_MUTANTS", (stale,))
+    problems = rm.compile_all(service)
+    assert [name for name, _ in problems] == ["old"] and "matched 0 times" in problems[0][1]
+    assert rm.main(["--compile", "--service-dir", str(service)]) == 2
+    assert "INVALID MUTANT old" in capsys.readouterr().err

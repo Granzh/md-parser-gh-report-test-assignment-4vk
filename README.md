@@ -43,6 +43,9 @@ Python-интеграционные тесты. Правила разработ�
   pytest api_tests -m selfcheck -q        # мета-тесты набора, сервер не нужен
   GHREPORT_BIN=... GITHUB_API_BASE_URL=... pytest api_tests -q
   python tools/check_contracts.py api_tests --tests api_tests --check-covers
+  # локальный сервер для пробного прогона и мутационная проверка набора (убиты ли все мутанты):
+  python api_tests/selfcheck/stub_server.py --port 8765
+  python api_tests/selfcheck/run_mutants.py
   ```
 
 ## Затраченное время

@@ -182,7 +182,7 @@ SERVICE_MUTANTS = (
                         'cur = FirstURL(f.Base, repo) + "&page=" + strconv.Itoa(pages+2)\n\t\t_ = next\n'),)),
     ServiceMutant("link_next_ignored", "the Link header is never consulted: only the first page is read",
                   (Edit(_ISSUES, lit("next, ok := linkhdr.NextURL(link, curURL)"),
-                        "next, ok := linkhdr.NextURL(nil, curURL)"),)),
+                        "next, ok := linkhdr.NextURL(nil, curURL)\n\t\t_ = link"),)),
     ServiceMutant("if_none_match_never_sent", "the stored ETag is not sent as If-None-Match",
                   (Edit(_ISSUES, lit("inm = entry.ETag"), 'inm = ""'),)),
     ServiceMutant("from_cache_always_false", "the trace never reports from_cache: true",
@@ -196,7 +196,7 @@ SERVICE_MUTANTS = (
     ServiceMutant("cache_drops_link", "a 304 answer without Link loses the stored Link (later pages vanish)",
                   (Edit(_ISSUES, lit('if len(link) == 0 && entry.Link != "" {'), "if false {"),)),
     ServiceMutant("retry_after_no_pause", "retry-after is parsed but the pause is zero",
-                  (Edit(_RATE, lit("return min(d, MaxRateLimitWait)"), "return 0"),)),
+                  (Edit(_RATE, lit("return min(d, MaxRateLimitWait)"), "_ = d\n\t\treturn 0"),)),
     ServiceMutant("rate_limit_403_not_recognised", "403 is never treated as a rate limit",
                   (Edit(_RATE, lit("if status != http.StatusForbidden && status != http.StatusTooManyRequests {"),
                         "if status != http.StatusTooManyRequests {"),)),
@@ -564,6 +564,31 @@ def validate(service_dir):
             apply_mutant(mutant, target)
 
 
+def compile_all(service_dir):
+    """Build every service mutant without running any test.
+
+    Args:
+        service_dir: Path of the service directory.
+
+    Returns:
+        List of (mutant id, error text) for mutants that are stale or do not compile; empty when all are valid.
+
+    Raises:
+        None.
+    """
+    problems = []
+    with tempfile.TemporaryDirectory(prefix="ghreport-compile-") as scratch:
+        for mutant in SERVICE_MUTANTS:
+            target = Path(scratch) / mutant.id
+            try:
+                copy_service(service_dir, target)
+                apply_mutant(mutant, target)
+                build_service(target, Path(scratch) / (mutant.id + ".exe"))
+            except (StaleMutant, BuildError) as error:
+                problems.append((mutant.id, str(error)))
+    return problems
+
+
 def run_all(service_dir, only=None, skip_baseline=False, log=print):
     """Execute the whole mutation check.
 
@@ -626,6 +651,21 @@ def run_all(service_dir, only=None, skip_baseline=False, log=print):
     return (0 if is_success(outcomes) else 1), outcomes
 
 
+def _flush_print(text):
+    """Print a progress line immediately (also when stdout is a file).
+
+    Args:
+        text: Line to print.
+
+    Returns:
+        None.
+
+    Raises:
+        None.
+    """
+    print(text, flush=True)
+
+
 def main(argv=None):
     """Command-line entry point.
 
@@ -644,8 +684,16 @@ def main(argv=None):
     parser.add_argument("--service-dir", default=str(REPO_ROOT / "service"), help="path of the Go service")
     parser.add_argument("--skip-baseline", action="store_true", help="skip the unmutated run (development only)")
     parser.add_argument("--validate", action="store_true", help="only check that every pattern matches once")
+    parser.add_argument("--compile", action="store_true", help="only check that every mutant compiles")
     args = parser.parse_args(argv)
     service_dir = Path(args.service_dir).resolve()
+    if args.compile:
+        problems = compile_all(service_dir)
+        for ident, text in problems:
+            print(f"INVALID MUTANT {ident}: {text}", file=sys.stderr)
+        if not problems:
+            print(f"all {len(SERVICE_MUTANTS)} service mutants compile")
+        return 2 if problems else 0
     if args.validate:
         try:
             validate(service_dir)
@@ -655,7 +703,7 @@ def main(argv=None):
         print(f"all {len(SERVICE_MUTANTS)} service mutation patterns match exactly once")
         return 0
     try:
-        code, outcomes = run_all(service_dir, args.only, args.skip_baseline)
+        code, outcomes = run_all(service_dir, args.only, args.skip_baseline, _flush_print)
     except KeyError as error:
         print(error, file=sys.stderr)
         return 2
