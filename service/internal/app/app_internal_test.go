@@ -120,6 +120,9 @@ func TestCollect(t *testing.T) {
 	if reports[0].Error != nil || reports[0].Issues == nil || *reports[1].Error != "not_found" || *reports[2].Error != "rate_limited" {
 		t.Fatalf("reports %+v", reports)
 	}
+	if strings.Contains(warn, "ghreport: b/b: ghreport:") || !strings.Contains(warn, "ghreport: b/b: ") {
+		t.Fatalf("diagnostic format: %q", warn)
+	}
 	if reports[1].Count != 0 || reports[1].Issues == nil || !strings.Contains(warn, "b/b") || !strings.Contains(warn, "c/c") {
 		t.Fatalf("failed report/diagnostics: %+v %q", reports[1], warn)
 	}

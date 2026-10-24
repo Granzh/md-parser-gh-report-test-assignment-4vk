@@ -173,7 +173,7 @@ func collect(ctx context.Context, f *issues.Fetcher, opts args.Options, errw io.
 			if unauthorized {
 				return nil, statusUnauthorized
 			}
-			fmt.Fprintf(errw, "ghreport: %s: %v\n", repo, err)
+			fmt.Fprintf(errw, "ghreport: %s: %s\n", repo, strings.TrimPrefix(err.Error(), "ghreport: "))
 			reports = append(reports, model.NewFailedRepoReport(repo.String(), code))
 			continue
 		}
