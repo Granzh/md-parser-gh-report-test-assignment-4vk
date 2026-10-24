@@ -1,0 +1,30 @@
+# Контекст сборки — каталог service/. В образ нужны только go.mod, cmd/ и internal/.
+.git
+.gitignore
+.idea
+.vscode
+
+# кэш и результаты работы службы, каталоги сборки
+.ghreport-cache
+ghreport-cache
+build
+dist
+bin
+*.exe
+*.out
+*.test
+*.jsonl
+*.log
+
+# секреты
+.env
+.env.*
+*.token
+*.pem
+*.key
+
+# тесты и документация не нужны для сборки бинарника
+**/*_test.go
+README.md
+Dockerfile
+.dockerignore
