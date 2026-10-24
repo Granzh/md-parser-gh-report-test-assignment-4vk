@@ -9,3 +9,4 @@
 | 2026-10-23 | 1.4 msgfmt: доводка и проверка | Фаззинг и свойства (test_fuzz, seed фиксирован), прогон Debug/RelWithDebInfo/Release с санитайзерами и без, gcov-покрытие, msgfmt/README.md, корневой README | | Claude Code |
 | 2026-10-24 | 2.1 ghreport: каркас и базовые пакеты | go.mod, internal/{args,config,model,exitcode,clock,output} с контрактами и таблицами тестов, правка линтера для Go raw-строк | | Claude Code |
 | 2026-10-24 | 2.2 ghreport: транспортный слой | linkhdr, trace, httpx (заголовки, ручные редиректы, повторы, лимиты), service/README.md, решения в decisions.md | | Claude Code |
+| 2026-10-24 | 2.3 ghreport: кэш и issue репозитория | cache (ETag+Link), testutil.FakeGitHub, issues.Fetcher (пагинация по Link, limit, since, дедупликация, фильтр PR, ErrorCode) | | Claude Code |
