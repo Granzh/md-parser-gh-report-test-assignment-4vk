@@ -25,10 +25,12 @@ def env():
     Raises:
         pytest.fail.Exception: A required variable is missing; reported without a traceback.
     """
+    problem = None
     try:
         return env_module.load_env()
     except env_module.EnvError as error:
-        pytest.fail(f"test environment is not configured: {error}", pytrace=False)
+        problem = str(error)
+    pytest.fail(f"test environment is not configured: {problem}", pytrace=False)
 
 
 @pytest.fixture
