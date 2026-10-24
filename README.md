@@ -1,5 +1,7 @@
 # vk-test
 
+[![CI](https://github.com/<OWNER>/<REPO>/actions/workflows/ci.yml/badge.svg)](https://github.com/<OWNER>/<REPO>/actions/workflows/ci.yml)
+
 Учебное задание из трёх частей:
 
 1. **msgfmt** — библиотека и утилита на C++17 (только стандартная библиотека): разбор подмножества Markdown в пару
@@ -18,7 +20,8 @@
 | `msgfmt/` | Часть 1: `include/msgfmt`, `src`, `tests`, `CMakeLists.txt`, [README](msgfmt/README.md) |
 | `service/` | Часть 2: модуль Go (`cmd/ghreport`, `internal/...`), `Dockerfile`, `.dockerignore`, [README](service/README.md) |
 | `api_tests/` | Часть 3: тесты `test_00…test_09`, `helpers/`, `selfcheck/` (stub-сервер, мутанты, мета-тесты), [README](api_tests/README.md) |
-| `tools/` | `check_env.py`, `check_contracts.py` (контракты и `covers:`), `check_repo.py` (гигиена), `verify_all.py`, `ghreport-docker.sh`; тесты в `tools/tests/` |
+| `tools/` | `check_env.py`, `check_contracts.py` (контракты и `covers:`), `check_repo.py` и `check_repo_hygiene.py` (гигиена), `check_workflows.py` (линтер workflow), `verify_all.py`, `ghreport-docker.sh`; тесты в `tools/tests/` |
+| `.github/` | `workflows/ci.yml`, `workflows/mutants.yml`, `workflows/release.yml`, `dependabot.yml` — см. раздел «CI/CD» |
 | `docs/` | Спецификация (`spec_*.md`), [decisions.md](docs/decisions.md), [COMPLIANCE.md](docs/COMPLIANCE.md), [WORKLOG.md](docs/WORKLOG.md) |
 
 ## Быстрый старт
@@ -74,7 +77,7 @@ python tools/verify_all.py --only service,suite --keep
 
 Скрипт делает `git clone --no-hardlinks` во временный каталог (проверяется **только закоммиченное** состояние) и
 выполняет шаги `env`, `msgfmt-release` (Release + `-Werror` + ctest), `msgfmt-sanitize` (ASan/UBSan, ноль сообщений),
-`service` (gofmt, vet, `go test -race`, сборка), `contracts` (линтер контрактов для msgfmt, service, api_tests, tools),
+`service` (gofmt, vet, `go test -race`, сборка), `contracts` (линтер контрактов для msgfmt, service, api_tests, tools), `workflows` (`check_workflows.py`),
 `hygiene` (секреты, бинарники, `.gitignore`), `selfchecks`, `suite` (основной набор против stub-сервера и бинарника,
 `GHREPORT_STRICT=1`), `docker-image` (сборка, `USER` не root, код 2 при `--repos` без значения), `docker-run` (прогон
 из контейнера и `pytest` через [tools/ghreport-docker.sh](tools/ghreport-docker.sh)) и, по флагу, `mutants`. В конце
@@ -82,6 +85,67 @@ python tools/verify_all.py --only service,suite --keep
 
 Полный прогон, включая санитайзеры и контейнер, рассчитан на Linux-хост с Docker. На Windows санитайзеры (mingw) и
 `docker-run` (`--network host` не достаёт до loopback хоста) пропускаются автоматически.
+
+## CI/CD
+
+Конфигурация — в `.github/`. Секреты в CI не нужны: тесты идут против stub-сервера, реальный GitHub API не вызывается.
+Права `GITHUB_TOKEN` по умолчанию — только чтение; расширены они лишь у job `release` в `release.yml`.
+Все сторонние actions закреплены полным SHA коммита (рядом комментарий с версией); обновления присылает Dependabot.
+
+### Что проверяется (`ci.yml`: push в `main`, pull request, ручной запуск)
+
+| Job | Что делает |
+|-----|------------|
+| `msgfmt` | матрица gcc/clang × release/sanitize: CMake ≥ 3.20, `-DMSGFMT_WERROR=ON`, `ctest`; ASan/UBSan с `halt_on_error=1`; при падении — артефакт `LastTest.log` |
+| `service` | Go из `service/go.mod` (≥ 1.22), запрет зависимостей (нет `require`, пустой `go.sum`), `gofmt -l`, `go vet`, `go test -race`, сборка; бинарник — артефакт на 1 день |
+| `docker` | сборка образа; `USER` не root; `--repos` без значения → код 2 и пустой stdout; прогон контейнера против stub (по журналу `--trace` служба обращалась именно по заданному адресу); токена нет в `docker history` и `ENV` |
+| `api-tests` | Python 3.10 и 3.12: `pytest api_tests` против stub и бинарника (`GHREPORT_STRICT=1`), затем `-m selfcheck`; на 3.12 ещё и набор через контейнер (`tools/ghreport-docker.sh`); при падении — артефакт с логами stub и pytest |
+| `tools-and-lint` | `pytest tools/tests`; линтер контрактов с `--check-covers` для msgfmt, service, api_tests, tools |
+| `hygiene` | `tools/check_repo_hygiene.py --history`: секреты, бинарники, файлы > 1 MiB, `.gitignore` — по дереву и всей истории |
+| `workflows-lint` | `tools/check_workflows.py` и `actionlint` (официальный образ, закреплён по дайджесту) |
+| `ci-ok` | итог: падает, если любой job не `success`. **Только он указывается как required status check** |
+
+Раз в неделю и вручную работает `mutants.yml` (мутационная проверка набора, ≈ 15 минут; таблица — в Summary запуска и
+в артефакте `mutants-table`).
+
+### Как воспроизвести локально
+
+```
+python tools/verify_all.py                   # все шаги на чистом клоне (нужны закоммиченные изменения)
+python tools/check_workflows.py .github/workflows
+python tools/check_repo_hygiene.py --history
+python tools/check_contracts.py tools --tests tools/tests --check-covers
+pytest tools/tests -q
+cmake -S msgfmt -B build -DCMAKE_BUILD_TYPE=Release -DMSGFMT_WERROR=ON [-DMSGFMT_SANITIZE=ON] && cmake --build build && ctest --test-dir build --output-on-failure
+cd service && gofmt -l . && go vet ./... && go test ./... -race -count=1 && go build -o ghreport ./cmd/ghreport
+docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.12   # синтаксис workflow (нужен Docker)
+```
+
+### Форк
+
+На форке workflows по умолчанию отключены: вкладка Actions → «I understand my workflows, go ahead and enable them».
+Секреты и переменные настраивать не нужно. Pull request из форка выполняется с правами только на чтение.
+
+### Релиз
+
+Тег `vX.Y.Z` на коммите, прошедшем CI, запускает `release.yml`: тесты, сборка Linux-бинарника, образ
+`ghcr.io/<owner>/<repo>:vX.Y.Z` (и `latest`) и **черновик** GitHub Release с бинарником и `SHA256SUMS`. Публикует Release
+человек. Тег создаётся вручную (`git tag vX.Y.Z && git push origin vX.Y.Z`); в этом репозитории теги не создавались.
+
+### Артефакты
+
+Actions → нужный запуск → раздел Artifacts внизу страницы: `msgfmt-<компилятор>-<режим>-logs`,
+`api-tests-py<версия>-logs`, `ghreport-linux` (хранится 1 день), `mutants-table`. Таблица мутантов также в Summary запуска `Mutants`.
+
+### Ручные шаги (вне файлов репозитория)
+
+1. Включить GitHub Actions для репозитория.
+2. Защита ветки `main`: required status check — только `ci-ok`; запретить force-push и удаление ветки.
+3. Settings → Actions → General → Workflow permissions: «Read repository contents permissions» для `GITHUB_TOKEN`.
+4. Включить Dependabot alerts и Dependabot version updates.
+5. Для GHCR: после первого релиза проверить видимость пакета (Packages → Package settings) и связать его с репозиторием.
+6. Дать куратору доступ к репозиторию (Settings → Collaborators) или сделать его публичным.
+7. Подставить `<OWNER>/<REPO>` в бейдж этого README.
 
 ## Затраченное время
 
