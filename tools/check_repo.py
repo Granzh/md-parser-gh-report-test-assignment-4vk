@@ -264,14 +264,15 @@ def parse_batch(data: bytes) -> list:
     return records
 
 
-def check_history_objects(git: Git) -> list:
+def check_history_objects(git: Git, max_bytes: int = MAX_BLOB_BYTES) -> list:
     """Inspect every blob ever committed.
 
     Args:
         git: Git runner.
+        max_bytes: Size limit in bytes; a blob strictly larger than this is reported.
 
     Returns:
-        Findings for blobs whose path is forbidden, whose size exceeds 1 MiB or that start with an executable magic
+        Findings for blobs whose path is forbidden, whose size exceeds ``max_bytes`` or that start with an executable magic
         number.
 
     Raises:
@@ -291,8 +292,8 @@ def check_history_objects(git: Git) -> list:
         path = paths[sha]
         if is_forbidden_path(path):
             findings.append(Finding("object", f"forbidden path in history: {path}"))
-        if len(data) > MAX_BLOB_BYTES:
-            findings.append(Finding("object", f"{path}: {len(data)} bytes (> 1 MiB)"))
+        if len(data) > max_bytes:
+            findings.append(Finding("object", f"{path}: {len(data)} bytes (> {max_bytes})"))
         magic = binary_kind(data[:4])
         if magic:
             findings.append(Finding("object", f"{path}: looks like a {magic} executable"))

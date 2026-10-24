@@ -5,8 +5,8 @@ Usage: ``python tools/verify_all.py [--with-mutants] [--only STEP[,STEP...]] [--
 The script clones the repository with ``git clone --no-hardlinks`` into a temporary directory (so only committed files
 are verified), runs the steps below one after another and prints a table ``step / status / seconds / details``.
 
-Steps: env, msgfmt-release, msgfmt-sanitize, service, contracts, hygiene, selfchecks, suite, docker-image, docker-run and, with
-``--with-mutants``, mutants.  A step is ``ok``, ``fail`` or ``skip`` (with a reason, e.g. no Docker daemon, sanitizers
+Steps: env, msgfmt-release, msgfmt-sanitize, service, contracts, workflows, hygiene, selfchecks, suite, docker-image,
+docker-run and, with ``--with-mutants``, mutants.  A step is ``ok``, ``fail`` or ``skip`` (with a reason, e.g. no Docker daemon, sanitizers
 unavailable on the host compiler).  Exit code: 0 when no step failed, 1 otherwise.
 
 All external commands go through an injectable ``runner`` and the stub server through an injectable ``start_stub``,
@@ -588,19 +588,38 @@ def step_contracts(ctx: Context) -> StepOutcome:
 
 
 def step_hygiene(ctx: Context) -> StepOutcome:
-    """Step ``hygiene``: tools/check_repo.py on the clone (secrets, binaries, .gitignore, clean tree).
+    """Step ``hygiene``: tools/check_repo.py and tools/check_repo_hygiene.py --history on the clone.
 
     Args:
         ctx: Step context.
 
     Returns:
-        OK with the script's summary line, or FAIL with its findings.
+        OK with the summary line of check_repo.py, or FAIL with the findings of the first failing script.
 
     Raises:
         None.
     """
-    results, bad = run_sequence(ctx, [("check_repo", [ctx.python, "tools/check_repo.py", "--repo", str(ctx.repo)],
-                                       ctx.repo)], timeout=900)
+    commands = [("check_repo", [ctx.python, "tools/check_repo.py", "--repo", str(ctx.repo)], ctx.repo),
+                ("check_repo_hygiene", [ctx.python, "tools/check_repo_hygiene.py", "--repo", str(ctx.repo),
+                                        "--history"], ctx.repo)]
+    results, bad = run_sequence(ctx, commands, timeout=900)
+    return bad or StepOutcome(OK, tail_lines(results[0].stdout, 1))
+
+
+def step_workflows(ctx: Context) -> StepOutcome:
+    """Step ``workflows``: tools/check_workflows.py over .github/workflows of the clone.
+
+    Args:
+        ctx: Step context.
+
+    Returns:
+        OK with the summary line (files, errors, warnings), or FAIL with the findings.
+
+    Raises:
+        None.
+    """
+    results, bad = run_sequence(ctx, [("check_workflows", [ctx.python, "tools/check_workflows.py",
+                                                          ".github/workflows"], ctx.repo)])
     return bad or StepOutcome(OK, tail_lines(results[0].stdout, 1))
 
 
@@ -771,7 +790,8 @@ def all_steps(with_mutants: bool) -> list:
         None.
     """
     steps = [("env", step_env), ("msgfmt-release", step_msgfmt_release), ("msgfmt-sanitize", step_msgfmt_sanitize),
-             ("service", step_service), ("contracts", step_contracts), ("hygiene", step_hygiene),
+             ("service", step_service), ("contracts", step_contracts), ("workflows", step_workflows),
+             ("hygiene", step_hygiene),
              ("selfchecks", step_selfchecks),
              ("suite", step_suite), ("docker-image", step_docker_image), ("docker-run", step_docker_run)]
     if with_mutants:
