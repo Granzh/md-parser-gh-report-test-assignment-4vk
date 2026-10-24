@@ -105,5 +105,4 @@ def test_no_item_is_lost_between_pages(oracle, profiles, existing_repos):
     """Spec 5.4 (skipped element between pages): two walks with different page sizes see the same issues."""
     found = collect(lambda repo: probes.probe_pagination_complete(oracle, repo, profiles.pages(repo)),
                     existing_repos)
-    assert not found, "
-".join(found)
+    assert not found, "\n".join(found)
