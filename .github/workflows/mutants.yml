@@ -1,0 +1,70 @@
+# Мутационная проверка набора api_tests (долгая, около 15 минут): раз в неделю и вручную.
+# Все мутанты должны быть убиты; секреты не нужны (stub-сервер, реальный GitHub API не вызывается).
+name: Mutants
+
+on:
+  schedule:
+    - cron: "17 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mutants-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  mutants:
+    name: mutation check
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: service/go.mod
+          cache: true
+          cache-dependency-path: service/go.mod
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: api_tests/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          pip install -r api_tests/requirements.txt
+          mkdir -p "$RUNNER_TEMP/logs"
+
+      # run_mutants.py сам собирает немутированную службу (baseline) и копии с мутациями.
+      - name: Run mutants
+        run: python api_tests/selfcheck/run_mutants.py 2>&1 | tee "$RUNNER_TEMP/logs/mutants.txt"
+
+      - name: Publish the table
+        if: always()
+        run: |
+          {
+            echo "## Mutation check"
+            echo
+            echo '```'
+            if [ -f "$RUNNER_TEMP/logs/mutants.txt" ]; then
+              cat "$RUNNER_TEMP/logs/mutants.txt"
+            else
+              echo "no output"
+            fi
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the table
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: mutants-table
+          path: ${{ runner.temp }}/logs/mutants.txt
+          if-no-files-found: warn
+          retention-days: 30

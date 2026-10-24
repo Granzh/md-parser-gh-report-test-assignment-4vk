@@ -1,0 +1,69 @@
+# Релиз по тегу vX.Y.Z: образ ghreport в GHCR + черновик GitHub Release с бинарником службы.
+# Единственный workflow, которому нужен секрет (встроенный GITHUB_TOKEN); сторонние секреты не используются.
+# Тег создаёт человек вручную на коммите, который прошёл CI; публикует Release тоже человек (черновик).
+name: Release
+
+on:
+  push:
+    tags: ["v[0-9]+.[0-9]+.[0-9]+"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: image and draft release
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Права расширены только здесь: contents: write — создать черновик Release, packages: write — записать образ в GHCR.
+    permissions:
+      contents: write
+      packages: write
+    env:
+      TAG: ${{ github.ref_name }}
+      REPOSITORY: ${{ github.repository }}
+      ACTOR: ${{ github.actor }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: service/go.mod
+          cache: true
+          cache-dependency-path: service/go.mod
+
+      - name: Validate the tag
+        run: |
+          if ! printf '%s' "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "tag must look like vX.Y.Z" >&2
+            exit 1
+          fi
+
+      - name: Test and build the binary
+        working-directory: service
+        run: |
+          go test ./... -race -count=1
+          mkdir -p ../dist
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags "-s -w" -o ../dist/ghreport-linux-amd64 ./cmd/ghreport
+          cd ../dist
+          sha256sum ghreport-linux-amd64 > SHA256SUMS
+
+      - name: Build and push the image to GHCR
+        run: |
+          image="ghcr.io/${REPOSITORY,,}"
+          printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$ACTOR" --password-stdin
+          docker build -t "$image:$TAG" -t "$image:latest" service/
+          docker push "$image:$TAG"
+          docker push "$image:latest"
+
+      - name: Create a draft release
+        run: |
+          gh release create "$TAG" dist/ghreport-linux-amd64 dist/SHA256SUMS \
+            --repo "$REPOSITORY" --draft --verify-tag --title "$TAG" --generate-notes

@@ -1,0 +1,411 @@
+# CI: сборка и проверка всех трёх частей. Секреты не нужны: тесты идут против stub-сервера (api_tests/selfcheck/stub_server.py),
+# реальный GitHub API не вызывается. В защите ветки main обязательной проверкой указывается только job `ci-ok`.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Права по умолчанию — только чтение; ни один job их не расширяет.
+permissions:
+  contents: read
+
+# Устаревшие запуски для одного PR отменяются; запуски main и ручные доводятся до конца.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  msgfmt:
+    name: msgfmt (${{ matrix.compiler }}, ${{ matrix.mode }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [gcc, clang]
+        mode: [release, sanitize]
+        include:
+          - compiler: gcc
+            cxx: g++
+          - compiler: clang
+            cxx: clang++
+    env:
+      CC: ${{ matrix.compiler }}
+      CXX: ${{ matrix.cxx }}
+      MODE: ${{ matrix.mode }}
+      ASAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+      UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Require CMake >= 3.20
+        run: |
+          version=$(cmake --version | sed -n '1s/[^0-9]*\([0-9][0-9.]*\).*/\1/p')
+          major=${version%%.*}
+          rest=${version#*.}
+          minor=${rest%%.*}
+          echo "cmake $version, $CC/$CXX"
+          if [ "$major" -lt 3 ] || { [ "$major" -eq 3 ] && [ "$minor" -lt 20 ]; }; then
+            echo "CMake 3.20 or newer is required" >&2
+            exit 1
+          fi
+
+      - name: Configure
+        run: |
+          flags=()
+          if [ "$MODE" = sanitize ]; then
+            flags+=(-DMSGFMT_SANITIZE=ON)
+          fi
+          cmake -S msgfmt -B build -DCMAKE_BUILD_TYPE=Release -DMSGFMT_WERROR=ON "${flags[@]}"
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+      - name: Upload test log
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: msgfmt-${{ matrix.compiler }}-${{ matrix.mode }}-logs
+          path: build/Testing/Temporary/LastTest.log
+          if-no-files-found: warn
+          retention-days: 7
+
+  service:
+    name: service (Go)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: service/go.mod
+          cache: true
+          # go.sum нет (зависимостей нет), поэтому ключ кэша строится по go.mod.
+          cache-dependency-path: service/go.mod
+
+      - name: Require Go >= 1.22
+        run: |
+          go version
+          directive=$(sed -n 's/^go \([0-9][0-9.]*\).*/\1/p' service/go.mod | head -n 1)
+          major=${directive%%.*}
+          rest=${directive#*.}
+          minor=${rest%%.*}
+          echo "go.mod declares go $directive"
+          if [ "$major" -lt 1 ] || { [ "$major" -eq 1 ] && [ "$minor" -lt 22 ]; }; then
+            echo "go.mod must declare Go 1.22 or newer" >&2
+            exit 1
+          fi
+
+      - name: No third-party dependencies
+        run: |
+          if grep -Eq '^[[:space:]]*require\b' service/go.mod; then
+            echo "service/go.mod has a require directive: only the standard library is allowed" >&2
+            exit 1
+          fi
+          if [ -s service/go.sum ]; then
+            echo "service/go.sum is not empty: only the standard library is allowed" >&2
+            exit 1
+          fi
+
+      - name: gofmt
+        working-directory: service
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "gofmt -l reports unformatted files:" >&2
+            echo "$unformatted" >&2
+            exit 1
+          fi
+
+      - name: go vet
+        working-directory: service
+        run: go vet ./...
+
+      - name: go test
+        working-directory: service
+        run: go test ./... -race -count=1
+
+      - name: go build
+        working-directory: service
+        run: CGO_ENABLED=0 go build -trimpath -o ghreport ./cmd/ghreport
+
+      - name: Upload binary
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ghreport-linux
+          path: service/ghreport
+          if-no-files-found: error
+          retention-days: 1
+
+  docker:
+    name: docker image
+    needs: service
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # Заведомо фальшивый токен-страж: он не должен оказаться ни в образе, ни в выводе, ни в журнале.
+      SENTINEL: test-token-DO-NOT-USE
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+
+      - name: Build image
+        run: docker build -t ghreport service/
+
+      - name: Image runs as a non-root user
+        run: |
+          user=$(docker inspect -f '{{.Config.User}}' ghreport)
+          echo "USER=[$user]"
+          case "$user" in
+            ""|0|root|0:*|root:*)
+              echo "the image must run as a non-root user" >&2
+              exit 1
+              ;;
+          esac
+
+      - name: Missing --repos value exits with 2 and prints nothing to stdout
+        run: |
+          code=0
+          out=$(docker run --rm ghreport --repos 2>/dev/null) || code=$?
+          echo "exit code $code, stdout [$out]"
+          if [ "$code" -ne 2 ] || [ -n "$out" ]; then
+            echo "expected exit code 2 and empty stdout" >&2
+            exit 1
+          fi
+
+      - name: Smoke run against the stub server
+        run: |
+          work="$RUNNER_TEMP/smoke"
+          mkdir -p "$work"
+          python api_tests/selfcheck/stub_server.py > "$work/stub.log" 2>&1 &
+          pid=$!
+          echo "STUB_PID=$pid" >> "$GITHUB_ENV"
+          deadline=$((SECONDS + 30))
+          url=""
+          while [ "$SECONDS" -lt "$deadline" ]; do
+            url=$(sed -n 's/^READY //p' "$work/stub.log" | head -n 1)
+            [ -n "$url" ] && break
+            kill -0 "$pid" 2>/dev/null || { echo "stub server exited early" >&2; cat "$work/stub.log" >&2; exit 1; }
+            sleep 0.2
+          done
+          [ -n "$url" ] || { echo "stub server did not become ready in 30 s" >&2; exit 1; }
+          echo "stub at $url"
+          # --network host и -e GITHUB_API_BASE_URL задаёт обёртка; токен передаётся только по имени.
+          GITHUB_API_BASE_URL="$url" GITHUB_TOKEN="$SENTINEL" tools/ghreport-docker.sh \
+            --repos stub/small --out - --trace "$work/trace.jsonl" --cache-dir "$work/cache" \
+            > "$work/report.json" 2> "$work/stderr.txt"
+          # Служба обратилась именно по заданному адресу (журнал запросов службы), и отчёт верный.
+          python -c '
+          import json, sys
+          base, report, trace = sys.argv[1].rstrip("/"), sys.argv[2], sys.argv[3]
+          counts = [(r["repo"], r["error"], r["count"]) for r in json.load(open(report))["repos"]]
+          assert counts == [("stub/small", None, 3)], counts
+          urls = [json.loads(line)["url"] for line in open(trace) if line.strip()]
+          assert urls, "empty trace"
+          assert all(u.startswith(base + "/") for u in urls), urls
+          assert any(u.startswith(base + "/repos/stub/small/issues") for u in urls), urls
+          print("ok:", urls[0])
+          ' "$url" "$work/report.json" "$work/trace.jsonl"
+          if grep -rqF "$SENTINEL" "$work/report.json" "$work/trace.jsonl" "$work/stderr.txt"; then
+            echo "the token leaked into the report, the trace or stderr" >&2
+            exit 1
+          fi
+
+      - name: Stop the stub server
+        if: always()
+        run: kill "$STUB_PID" 2>/dev/null || true
+
+      - name: Token is not baked into the image
+        run: |
+          docker history --no-trunc ghreport > "$RUNNER_TEMP/history.txt"
+          env_dump=$(docker inspect -f '{{json .Config.Env}}' ghreport)
+          if grep -qF "$SENTINEL" "$RUNNER_TEMP/history.txt"; then
+            echo "token sentinel found in docker history" >&2
+            exit 1
+          fi
+          if grep -q 'GITHUB_TOKEN' "$RUNNER_TEMP/history.txt" || printf '%s' "$env_dump" | grep -q 'GITHUB_TOKEN'; then
+            echo "GITHUB_TOKEN is mentioned in docker history or in the image ENV" >&2
+            exit 1
+          fi
+
+  api-tests:
+    name: api-tests (Python ${{ matrix.python-version }})
+    needs: service
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.12"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: api_tests/requirements.txt
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: ghreport-linux
+          path: bin
+
+      - name: Install dependencies
+        run: |
+          chmod +x bin/ghreport
+          pip install -r api_tests/requirements.txt
+          mkdir -p "$RUNNER_TEMP/logs"
+
+      - name: Start the stub server
+        run: |
+          logs="$RUNNER_TEMP/logs"
+          python api_tests/selfcheck/stub_server.py > "$logs/stub.log" 2>&1 &
+          pid=$!
+          deadline=$((SECONDS + 30))
+          url=""
+          while [ "$SECONDS" -lt "$deadline" ]; do
+            url=$(sed -n 's/^READY //p' "$logs/stub.log" | head -n 1)
+            [ -n "$url" ] && break
+            kill -0 "$pid" 2>/dev/null || { echo "stub server exited early" >&2; cat "$logs/stub.log" >&2; exit 1; }
+            sleep 0.2
+          done
+          [ -n "$url" ] || { echo "stub server did not become ready in 30 s" >&2; exit 1; }
+          {
+            echo "STUB_PID=$pid"
+            echo "GHREPORT_BIN=$PWD/bin/ghreport"
+            echo "GITHUB_API_BASE_URL=$url"
+            echo "GHREPORT_STRICT=1"
+          } >> "$GITHUB_ENV"
+          echo "stub at $url"
+
+      - name: pytest api_tests (native binary)
+        run: pytest api_tests -q -rs 2>&1 | tee "$RUNNER_TEMP/logs/pytest.log"
+
+      - name: pytest api_tests -m selfcheck
+        run: pytest api_tests -m selfcheck -q 2>&1 | tee "$RUNNER_TEMP/logs/pytest-selfcheck.log"
+
+      - name: pytest api_tests (container through tools/ghreport-docker.sh)
+        if: matrix.python-version == '3.12' && hashFiles('tools/ghreport-docker.sh') != ''
+        run: |
+          docker build -t ghreport service/
+          GHREPORT_BIN="$PWD/tools/ghreport-docker.sh" pytest api_tests -q -rs \
+            2>&1 | tee "$RUNNER_TEMP/logs/pytest-container.log"
+
+      - name: Stop the stub server
+        if: always()
+        run: kill "$STUB_PID" 2>/dev/null || true
+
+      - name: Upload logs
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: api-tests-py${{ matrix.python-version }}-logs
+          path: ${{ runner.temp }}/logs
+          if-no-files-found: warn
+          retention-days: 7
+
+  tools-and-lint:
+    name: tools tests and contracts lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: api_tests/requirements.txt
+
+      - name: Install pytest
+        run: pip install -r api_tests/requirements.txt
+
+      - name: pytest tools/tests
+        run: pytest tools/tests -q
+
+      - name: Contracts lint
+        run: |
+          python tools/check_contracts.py msgfmt --tests msgfmt/tests --check-covers
+          python tools/check_contracts.py service --tests service --check-covers
+          python tools/check_contracts.py api_tests --tests api_tests --check-covers
+          python tools/check_contracts.py tools --tests tools/tests --check-covers
+
+  hygiene:
+    name: repository hygiene
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+
+      - name: Secrets, binaries, large files, .gitignore (tree and history)
+        run: python tools/check_repo_hygiene.py --history
+
+  workflows-lint:
+    name: workflows lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+
+      - name: tools/check_workflows.py
+        run: python tools/check_workflows.py .github/workflows
+
+      - name: actionlint (official image, pinned by digest)
+        run: |
+          docker run --rm -v "$PWD:/repo" -w /repo \
+            rhysd/actionlint:1.7.12@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667 \
+            -color
+
+  # Единственная обязательная проверка для защиты ветки: падает, если любой из job'ов не success.
+  ci-ok:
+    name: ci-ok
+    if: always()
+    needs: [msgfmt, service, docker, api-tests, tools-and-lint, hygiene, workflows-lint]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Every job succeeded
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "results: $RESULTS"
+          for result in $RESULTS; do
+            if [ "$result" != "success" ]; then
+              echo "a required job did not succeed" >&2
+              exit 1
+            fi
+          done
